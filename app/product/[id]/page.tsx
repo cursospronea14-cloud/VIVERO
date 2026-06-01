@@ -1,7 +1,7 @@
-'use client'
-// Al inicio del archivo, después de los imports
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const runtime = 'edge'
+
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
