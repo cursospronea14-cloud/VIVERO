@@ -1,8 +1,8 @@
+'use client'
+
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const revalidate = 0
-
-'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -80,7 +80,6 @@ export default function ProductPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Imagen */}
         <div className="bg-white rounded-xl overflow-hidden shadow-lg border border-arena">
           {product.image_url ? (
             <Image
@@ -97,7 +96,6 @@ export default function ProductPage() {
           )}
         </div>
 
-        {/* Información */}
         <div>
           <h1 className="text-3xl font-serif text-agave mb-2">{product.name}</h1>
           <p className="text-gris-suave mb-4">{product.description || 'Planta de fácil cuidado'}</p>
