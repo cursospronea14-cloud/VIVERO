@@ -1,8 +1,8 @@
+'use client'
+
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const revalidate = 0
-
-'use client'
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -68,7 +68,6 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Hero section con versículo */}
       <div className="text-center py-12 mb-8 bg-arena/30 rounded-2xl">
         <h1 className="text-4xl md:text-5xl font-serif text-agave mb-4">
           Florece - Cactus y Suculentas
@@ -81,7 +80,6 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Filtro de categorías */}
       <div className="flex flex-wrap gap-2 mb-8 justify-center">
         <button
           onClick={() => setSelectedCategory(null)}
@@ -108,7 +106,6 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* Grid de productos */}
       {loading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-agave"></div>
