@@ -1,11 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Obtener variables con fallback para build time
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// Validación con error amigable
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Faltan las variables de entorno: NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY')
+// Si estamos en build time (sin variables), crear un cliente dummy
+const isBuildTime = !supabaseUrl || !supabaseAnonKey
+
+if (isBuildTime && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️ Build time: Usando cliente dummy de Supabase')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Cliente dummy para build time, real para runtime
+export const supabase = createClient(
+  isBuildTime ? 'https://placeholder.supabase.co' : supabaseUrl,
+  isBuildTime ? 'placeholder' : supabaseAnonKey,
+  {
+    auth: {
+      persistSession: !isBuildTime,
+      autoRefreshToken: !isBuildTime,
+    },
+  }
+)
