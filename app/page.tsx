@@ -1,13 +1,10 @@
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
-
 
 'use client'
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import ProductCard from '@/components/ProductCard'
-import Image from 'next/image'
 
 interface Product {
   id: number
@@ -27,7 +24,6 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchCategories()
-    fetchProducts()
   }, [])
 
   useEffect(() => {
@@ -35,28 +31,37 @@ export default function HomePage() {
   }, [selectedCategory])
 
   async function fetchCategories() {
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .order('display_order')
-    if (data) setCategories(data)
+    try {
+      const { data } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order')
+      if (data) setCategories(data)
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
   }
 
   async function fetchProducts() {
     setLoading(true)
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
+    try {
+      let query = supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
 
-    if (selectedCategory) {
-      query = query.eq('category_id', selectedCategory)
+      if (selectedCategory) {
+        query = query.eq('category_id', selectedCategory)
+      }
+
+      const { data } = await query
+      if (data) setProducts(data)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    } finally {
+      setLoading(false)
     }
-
-    const { data } = await query
-    if (data) setProducts(data)
-    setLoading(false)
   }
 
   return (
