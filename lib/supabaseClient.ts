@@ -1,20 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Obtener variables con fallback para build time
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// Variables de entorno
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Si estamos en build time (sin variables), crear un cliente dummy
-const isBuildTime = !supabaseUrl || !supabaseAnonKey
+// Verificar si estamos en build time (Vercel) o en desarrollo local
+const isBuildTime = typeof window === 'undefined' && (!supabaseUrl || !supabaseAnonKey)
 
-if (isBuildTime && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️ Build time: Usando cliente dummy de Supabase')
+if (isBuildTime) {
+  console.warn('⚠️ Build time: Usando valores dummy para Supabase')
 }
 
-// Cliente dummy para build time, real para runtime
+// Cliente de Supabase: real en runtime, dummy en build time
 export const supabase = createClient(
-  isBuildTime ? 'https://placeholder.supabase.co' : supabaseUrl,
-  isBuildTime ? 'placeholder' : supabaseAnonKey,
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder',
   {
     auth: {
       persistSession: !isBuildTime,
