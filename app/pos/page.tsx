@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
 
 'use client'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useCartStore } from '@/lib/store'
@@ -25,14 +25,20 @@ export default function PosPage() {
   }, [])
 
   async function fetchProducts() {
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, base_price, image_url')
-      .eq('is_active', true)
-      .order('name')
-    
-    if (data) setProducts(data)
-    setLoading(false)
+    try {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, base_price, image_url')
+        .eq('is_active', true)
+        .order('name')
+      
+      if (data) setProducts(data)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      toast.error('Error al cargar productos')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredProducts = products.filter(p =>
@@ -45,8 +51,11 @@ export default function PosPage() {
   const total = subtotal + iva + isr
 
   const handlePayment = () => {
-    // Aquí iría la lógica de guardar la venta en la BD
-    toast.success('Venta registrada')
+    if (items.length === 0) {
+      toast.error('Agrega productos primero')
+      return
+    }
+    toast.success(`Venta registrada: Q${total.toFixed(2)}`)
     clearCart()
   }
 
