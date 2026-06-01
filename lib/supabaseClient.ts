@@ -1,24 +1,25 @@
+// Este archivo NO debe fallar aunque falten variables en build time
 import { createClient } from '@supabase/supabase-js'
 
-// Variables de entorno
+// Valores dummy para build time (NUNCA se usan en producción real)
+const DEFAULT_URL = 'https://placeholder.supabase.co'
+const DEFAULT_KEY = 'placeholder'
+
+// Obtener variables del entorno
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Verificar si estamos en build time (Vercel) o en desarrollo local
-const isBuildTime = typeof window === 'undefined' && (!supabaseUrl || !supabaseAnonKey)
+// Detectar si estamos en build time (Vercel)
+// En build time, 'process.env.NODE_ENV' === 'production' pero window no existe
+const isBuildTime = typeof window === 'undefined'
 
-if (isBuildTime) {
-  console.warn('⚠️ Build time: Usando valores dummy para Supabase')
+// Usar valores reales SOLO si existen Y no estamos en build time
+const finalUrl = (!isBuildTime && supabaseUrl) ? supabaseUrl : DEFAULT_URL
+const finalKey = (!isBuildTime && supabaseAnonKey) ? supabaseAnonKey : DEFAULT_KEY
+
+// Solo mostrar warning si estamos en runtime (no en build)
+if (!isBuildTime && (!supabaseUrl || !supabaseAnonKey)) {
+  console.error('❌ Error: Faltan variables de entorno de Supabase en runtime')
 }
 
-// Cliente de Supabase: real en runtime, dummy en build time
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder',
-  {
-    auth: {
-      persistSession: !isBuildTime,
-      autoRefreshToken: !isBuildTime,
-    },
-  }
-)
+export const supabase = createClient(finalUrl, finalKey)
