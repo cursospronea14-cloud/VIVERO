@@ -1,8 +1,8 @@
+'use client'
+
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const revalidate = 0
-
-'use client'
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -63,14 +63,12 @@ export default function PosPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header POS */}
       <div className="bg-agave text-white p-4">
         <h1 className="text-xl font-bold">Punto de Venta - Florece</h1>
         <p className="text-sm text-arena">POS para empleados</p>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Panel izquierdo: productos */}
         <div className="flex-1 flex flex-col p-4">
           <input
             type="text"
@@ -107,7 +105,6 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* Panel derecho: carrito */}
         <div className="w-96 bg-white border-l flex flex-col">
           <div className="p-4 border-b bg-agave text-white">
             <h2 className="font-bold">Carrito de venta</h2>
