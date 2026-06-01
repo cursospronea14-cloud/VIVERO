@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
 
 'use client'
 
@@ -33,14 +32,20 @@ export default function ProductPage() {
   }, [id])
 
   async function fetchProduct() {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', id)
-      .single()
-    
-    if (data) setProduct(data)
-    setLoading(false)
+    try {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single()
+      
+      if (data) setProduct(data)
+    } catch (error) {
+      console.error('Error fetching product:', error)
+      toast.error('Error al cargar el producto')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleAddToCart = () => {
