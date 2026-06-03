@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   })
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
+  const [lowStockProducts, setLowStockProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function AdminDashboard() {
       fetchStats(),
       fetchRecentOrders(),
       fetchFeaturedProducts(),
+      fetchLowStockProducts(),
     ])
     setLoading(false)
   }
@@ -39,13 +41,11 @@ export default function AdminDashboard() {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
     const monthlySales = salesData?.filter(o => o.created_at >= startOfMonth).reduce((sum, o) => sum + o.total, 0) || 0
     
-    const { data: lowStockData } = await supabase.from('branch_stock').select('*').lt('quantity', 5)
-    
     setStats({
       totalProducts: productsCount || 0,
       totalOrders: ordersCount || 0,
       totalSales,
-      lowStock: lowStockData?.length || 0,
+      lowStock: 0,
       monthlySales,
     })
   }
@@ -60,6 +60,11 @@ export default function AdminDashboard() {
     if (data) setFeaturedProducts(data)
   }
 
+  async function fetchLowStockProducts() {
+    const { data } = await supabase.from('branch_stock').select('product_id, quantity, products(name)').lt('quantity', 5).limit(5)
+    if (data) setLowStockProducts(data)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -70,20 +75,17 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      {/* Header con bienvenida */}
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-[#1B4332]">Panel de Control</h1>
         <p className="text-[#6B6B6B] mt-1">Bienvenido al sistema de gestión de Florece</p>
       </div>
 
-      {/* Tarjetas de estadísticas */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-xl shadow-lg p-6 text-white">
           <div className="flex justify-between items-start">
-            <div>
-              <p className="text-white/80 text-sm">Total Productos</p>
-              <p className="text-3xl font-bold mt-1">{stats.totalProducts}</p>
-            </div>
+            <div><p className="text-white/80 text-sm">Total Productos</p><p className="text-3xl font-bold mt-1">{stats.totalProducts}</p></div>
             <span className="text-3xl">🌵</span>
           </div>
         </div>
@@ -101,16 +103,16 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Productos destacados */}
+      {/* Featured Products */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-[#1B4332]">🌵 Productos Destacados</h2>
-          <Link href="/admin/productos" className="text-[#E76F51] text-sm hover:underline">Ver todos →</Link>
+          <Link href="/admin/productos" className="text-[#E76F51] text-sm hover:underline">Ver catálogo completo →</Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {featuredProducts.map((product) => (
-            <div key={product.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
-              <div className="h-32 bg-[#F5F5F0] flex items-center justify-center">
+            <div key={product.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition group">
+              <div className="h-32 bg-[#F5F5F0] flex items-center justify-center group-hover:bg-[#E9D8A6]/30 transition">
                 {product.image_url ? (
                   <Image src={product.image_url} alt={product.name} width={80} height={80} className="object-cover" />
                 ) : (
@@ -126,32 +128,19 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Alertas y pedidos recientes */}
+      {/* Two column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Alertas de stock bajo */}
-        {stats.lowStock > 0 && (
-          <div className="bg-[#FEF3C7] rounded-xl p-4 border-l-4 border-[#E76F51]">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div>
-                <p className="font-semibold text-[#92400E]">Stock Bajo</p>
-                <p className="text-sm text-[#92400E]">Hay {stats.lowStock} productos con stock bajo. Revisa el inventario.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Pedidos recientes */}
+        {/* Recent Orders */}
         <div className="bg-white rounded-xl shadow-md">
           <div className="p-4 border-b border-[#E9D8A6]">
             <h2 className="font-semibold text-[#1B4332]">📋 Pedidos Recientes</h2>
           </div>
           <div className="divide-y divide-[#E9D8A6]">
-            {recentOrders.slice(0, 3).map((order) => (
-              <div key={order.id} className="p-4 flex justify-between items-center">
+            {recentOrders.length > 0 ? recentOrders.map((order) => (
+              <div key={order.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
                 <div>
                   <p className="font-medium text-sm">{order.customer_name}</p>
-                  <p className="text-xs text-[#6B6B6B]}">{new Date(order.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-[#6B6B6B]">{new Date(order.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-[#1B4332]">Q{order.total?.toFixed(2)}</p>
@@ -160,7 +149,25 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               </div>
-            ))}
+            )) : <div className="p-8 text-center text-[#6B6B6B]">No hay pedidos recientes</div>}
+          </div>
+        </div>
+
+        {/* Low Stock Alerts */}
+        <div className="bg-white rounded-xl shadow-md">
+          <div className="p-4 border-b border-[#E9D8A6]">
+            <h2 className="font-semibold text-[#E76F51]">⚠️ Alertas de Stock Bajo</h2>
+          </div>
+          <div className="divide-y divide-[#E9D8A6]">
+            {lowStockProducts.length > 0 ? lowStockProducts.map((item, idx) => (
+              <div key={idx} className="p-4 flex justify-between items-center">
+                <div>
+                  <p className="font-medium text-sm">{item.products?.name || 'Producto'}</p>
+                  <p className="text-xs text-[#6B6B6B]">Stock actual: {item.quantity} unidades</p>
+                </div>
+                <Link href="/admin/inventario" className="text-[#1B4332] text-sm hover:underline">Reabastecer →</Link>
+              </div>
+            )) : <div className="p-8 text-center text-[#6B6B6B]">✓ Todos los productos tienen stock suficiente</div>}
           </div>
         </div>
       </div>
