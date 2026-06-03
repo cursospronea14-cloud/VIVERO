@@ -14,20 +14,20 @@ export default function LoginPage() {
   const router = useRouter()
 
   const tips = [
-    { text: 'Los cactus almacenan agua en sus tejidos, permitiéndoles sobrevivir largas temporadas de sequía.', icon: '💧', image: '🌵' },
-    { text: 'Las suculentas necesitan riego profundo pero espaciado. Mejor que le falte agua a que le sobre.', icon: '💚', image: '🌿' },
-    { text: 'La mayoría de cactus y suculentas necesitan al menos 4-6 horas de luz solar directa al día.', icon: '☀️', image: '☀️' },
-    { text: 'Usa macetas con drenaje y tierra especial para cactus para evitar encharcamientos.', icon: '🪴', image: '🌱' },
-    { text: 'Muchas suculentas florecen en primavera. Sus flores pueden durar semanas.', icon: '🌸', image: '🌸' },
-    { text: 'Ofrecemos precios especiales por mayoreo. Consulta nuestras promociones.', icon: '📦', image: '📦' },
-    { text: 'Realizamos envíos a domicilio en toda Guatemala.', icon: '🚚', image: '🚚' },
-    { text: 'Aceptamos pagos en Quetzales (GTQ) y Dólares (USD).', icon: '💵', image: '💵' },
+    { title: '🌵 Cuidado de Cactus', text: 'Los cactus almacenan agua en sus tejidos. Riega solo cuando la tierra esté completamente seca.', icon: '💧' },
+    { title: '🌿 Suculentas Saludables', text: 'Las suculentas necesitan riego profundo pero espaciado. Mejor que le falte agua a que le sobre.', icon: '💚' },
+    { title: '☀️ Luz Solar', text: 'Necesitan al menos 4-6 horas de luz solar directa al día para un crecimiento óptimo.', icon: '☀️' },
+    { title: '🪴 Macetas y Drenaje', text: 'Usa macetas con agujeros y tierra especial para cactus para evitar encharcamientos.', icon: '🌱' },
+    { title: '🌸 Floración', text: 'Muchas suculentas florecen en primavera. Sus flores pueden durar semanas.', icon: '🌸' },
+    { title: '📦 Precios por Mayoreo', text: 'Ofrecemos precios especiales por volumen. Consulta nuestras promociones.', icon: '📦' },
+    { title: '🚚 Envíos a Domicilio', text: 'Realizamos envíos a toda Guatemala. Pregunta por tu zona.', icon: '🚚' },
+    { title: '💵 Métodos de Pago', text: 'Aceptamos pagos en Quetzales (GTQ) y Dólares (USD).', icon: '💵' },
   ]
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTip((prev) => (prev + 1) % tips.length)
-    }, 6000)
+    }, 7000)
     return () => clearInterval(interval)
   }, [])
 
@@ -62,100 +62,106 @@ export default function LoginPage() {
     setLoading(false)
   }
 
-  const tip = tips[currentTip]
+  const current = tips[currentTip]
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1B4332]/5 to-[#E9D8A6]/20">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-4">
-        
-        {/* Panel izquierdo - Información y marca */}
-        <div className="bg-[#F5F5F0] rounded-2xl shadow-xl p-8 hidden lg:block">
-          <div className="h-full flex flex-col">
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-              <div className="w-32 h-32 bg-[#1B4332] rounded-full flex items-center justify-center shadow-lg overflow-hidden">
-                <Image
-                  src="/logo.png"
-                  alt="Florece Logo"
-                  width={120}
-                  height={120}
-                  className="object-cover"
-                />
-              </div>
-            </div>
-            
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-[#1B4332]">Florece</h2>
-              <p className="text-[#4A4A4A]">Cactus y Suculentas</p>
-              <div className="border-l-4 border-[#1B4332] pl-4 mt-4 mx-auto max-w-xs">
-                <p className="text-[#2D2D2D] italic text-sm">"Dios hace florecer el desierto. Isaías 35:1"</p>
-              </div>
-            </div>
+    <div className="min-h-screen flex">
+      {/* Panel izquierdo - ESTÁTICO (no se mueve) */}
+      <div className="w-1/2 bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] flex flex-col items-center justify-center p-12">
+        <div className="text-center max-w-md">
+          {/* Logo circular */}
+          <div className="w-32 h-32 mx-auto mb-6 bg-white rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
+            <Image
+              src="/logo.png"
+              alt="Florece Logo"
+              width={120}
+              height={120}
+              className="object-cover"
+              priority
+              onError={(e) => {
+                console.error('Error loading logo')
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          </div>
+          
+          <h1 className="text-4xl font-bold text-white mb-2">Florece</h1>
+          <p className="text-[#E9D8A6] text-lg mb-6">Cactus y Suculentas</p>
+          
+          <div className="border-l-4 border-[#E9D8A6] pl-4 mb-8">
+            <p className="text-white/90 italic text-lg">"Dios hace florecer el desierto"</p>
+            <p className="text-white/70 text-sm mt-1">Isaías 35:1</p>
+          </div>
 
-            {/* Tip rotativo */}
-            <div className="bg-white rounded-xl p-5 shadow-md mt-4 border border-[#E9D8A6]">
-              <div className="text-center">
-                <span className="text-5xl block mb-3">{tip.image}</span>
-                <p className="text-[#4A4A4A] text-sm leading-relaxed">{tip.text}</p>
-              </div>
-            </div>
-
-            {/* Características */}
-            <div className="mt-6 pt-6 border-t border-[#E9D8A6]">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-[#4A4A4A]"><span>🚚</span><span>Envíos a domicilio</span></div>
-                <div className="flex items-center gap-2 text-[#4A4A4A]"><span>💳</span><span>Pagos en GTQ/USD</span></div>
-                <div className="flex items-center gap-2 text-[#4A4A4A]"><span>📦</span><span>Precios por mayoreo</span></div>
-                <div className="flex items-center gap-2 text-[#4A4A4A]"><span>🌱</span><span>Guía de cuidado</span></div>
-              </div>
-            </div>
+          {/* Características estáticas */}
+          <div className="grid grid-cols-2 gap-4 text-white/80 text-sm mt-8">
+            <div className="flex items-center gap-2"><span>🚚</span><span>Envíos a domicilio</span></div>
+            <div className="flex items-center gap-2"><span>💳</span><span>Pagos GTQ/USD</span></div>
+            <div className="flex items-center gap-2"><span>📦</span><span>Precios por mayoreo</span></div>
+            <div className="flex items-center gap-2"><span>🌱</span><span>Guía de cuidado</span></div>
           </div>
         </div>
+      </div>
 
-        {/* Panel derecho - Formulario */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <div className="w-24 h-24 bg-[#1B4332] rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
-              <Image src="/logo.png" alt="Logo" width={80} height={80} className="object-cover" />
+      {/* Panel derecho - MÓVIL (información animada + formulario) */}
+      <div className="w-1/2 bg-[#FDFBF7] flex flex-col justify-center p-12 overflow-y-auto">
+        <div className="max-w-md mx-auto w-full">
+          {/* Tarjeta de tip animada */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-[#E9D8A6] animate-pulse-slow">
+            <div className="flex items-start gap-4">
+              <div className="text-5xl">{current.icon}</div>
+              <div>
+                <h3 className="font-bold text-[#1B4332] text-lg mb-2">{current.title}</h3>
+                <p className="text-[#4A4A4A] text-sm leading-relaxed">{current.text}</p>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-[#1B4332]">Acceso al Sistema</h1>
-            <p className="text-[#6B6B6B] text-sm mt-1">Ingresa tus credenciales</p>
+            <div className="mt-4 flex justify-center gap-2">
+              {tips.map((_, idx) => (
+                <div key={idx} className={`w-2 h-2 rounded-full transition-all ${idx === currentTip ? 'bg-[#1B4332] w-4' : 'bg-[#E9D8A6]'}`} />
+              ))}
+            </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Correo electrónico</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent"
-                placeholder="admin@florece.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#1B4332] text-white py-2.5 rounded-lg font-semibold hover:bg-[#2D6A4F] transition disabled:opacity-50"
-            >
-              {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
-            </button>
-          </form>
+          {/* Formulario de login */}
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-[#1B4332] mb-2">Acceso al Sistema</h2>
+            <p className="text-[#6B6B6B] text-sm mb-6">Ingresa tus credenciales para continuar</p>
 
-          <div className="mt-6 pt-4 border-t border-[#E9D8A6] text-center">
-            <p className="text-xs text-[#6B6B6B]">Sistema de gestión de vivero</p>
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Correo electrónico</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent"
+                  placeholder="admin@florece.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332] focus:border-transparent"
+                  placeholder="••••••••"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#1B4332] text-white py-2.5 rounded-lg font-semibold hover:bg-[#2D6A4F] transition disabled:opacity-50"
+              >
+                {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-4 border-t border-[#E9D8A6] text-center">
+              <p className="text-xs text-[#6B6B6B]">¿Problemas para acceder? Contacta al administrador</p>
+            </div>
           </div>
         </div>
       </div>
