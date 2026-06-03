@@ -4,7 +4,10 @@ import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
   title: 'Florece - Cactus y Suculentas',
-  description: 'Dios hace florecer el desierto. Isaías 35:1',
+  description: 'Sistema de gestión de vivero',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
