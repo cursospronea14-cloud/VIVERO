@@ -11,15 +11,12 @@ export async function middleware(req: NextRequest) {
   const isAdminPage = req.nextUrl.pathname.startsWith('/admin')
   const isPosPage = req.nextUrl.pathname.startsWith('/pos')
 
-  // Si no hay sesión y no está en login, redirigir a login
   if (!session && !isAuthPage) {
     const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Si hay sesión y está en login, redirigir según rol
   if (session && isAuthPage) {
-    // Obtener rol del usuario
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -33,7 +30,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Verificar acceso a rutas de admin
   if (isAdminPage && session) {
     const { data: profile } = await supabase
       .from('profiles')
