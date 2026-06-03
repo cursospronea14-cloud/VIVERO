@@ -48,11 +48,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl">
         <div className="p-4 border-b border-white/20">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-full overflow-hidden">
-              <Image src="/logo.png" alt="Logo" width={40} height={40} className="object-cover" />
+            <div className="w-10 h-10 bg-white rounded-full overflow-hidden flex items-center justify-center">
+              <Image src="/logo.svg" alt="Logo" width={32} height={32} />
             </div>
             <div>
-              <h1 className="font-bold">Florece</h1>
+              <h1 className="font-bold">FLORECE</h1>
               <p className="text-xs text-white/60">Panel Admin</p>
             </div>
           </div>
@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
                 pathname === item.href
                   ? 'bg-white/20 text-white'
                   : 'hover:bg-white/10 text-white/80'
@@ -76,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20">
           <button
             onClick={() => supabase.auth.signOut()}
-            className="flex items-center gap-3 text-white/80 hover:text-white w-full px-4 py-2 rounded-lg hover:bg-white/10"
+            className="flex items-center gap-3 text-white/80 hover:text-white w-full px-4 py-2 rounded-xl hover:bg-white/10 transition"
           >
             <span>🚪</span>
             <span>Cerrar sesión</span>
