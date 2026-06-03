@@ -1,3 +1,9 @@
+"dependencies": {
+  "@supabase/auth-helpers-nextjs": "^0.10.0",
+  // ... otras dependencias
+}
+
+
 {
   "name": "vivero-florece",
   "version": "1.0.0",
