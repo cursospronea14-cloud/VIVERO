@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -17,40 +16,21 @@ const navItems = [
   { name: 'Configuración', href: '/admin/configuracion', icon: '⚙️' },
 ]
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    checkUser()
+    checkAuth()
   }, [])
 
-  async function checkUser() {
+  async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
       return
     }
-    
-    // Verificar que el usuario sea admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-    
-    if (profile?.role !== 'admin') {
-      router.push('/pos')
-      return
-    }
-    
-    setUser(session.user)
     setLoading(false)
   }
 
@@ -64,7 +44,6 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-agave text-white shadow-xl">
         <div className="p-4 border-b border-white/20">
           <h1 className="text-xl font-bold">Florece Admin</h1>
@@ -97,7 +76,6 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="ml-64 p-8">
         {children}
       </main>
