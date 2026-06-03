@@ -12,7 +12,7 @@
 
 @layer components {
   .btn-primary {
-    background-color: #2D6A4F;
+    background-color: #1B4332;
     color: white;
     font-weight: bold;
     padding: 0.5rem 1rem;
@@ -20,7 +20,7 @@
     transition: all 0.2s;
   }
   .btn-primary:hover {
-    opacity: 0.9;
+    background-color: #2D6A4F;
   }
   .btn-secondary {
     background-color: #E76F51;
@@ -36,5 +36,11 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     border: 1px solid #E9D8A6;
     overflow: hidden;
+  }
+  .info-panel {
+    background-color: #F5F5F0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    border-left: 4px solid #1B4332;
   }
 }
