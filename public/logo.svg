@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#1B4332" stroke="#E9D8A6" stroke-width="2"/>
+  <!-- Cuerpo del cactus -->
+  <rect x="43" y="25" width="14" height="40" rx="7" fill="#2D6A4F"/>
+  <rect x="30" y="35" width="12" height="25" rx="6" fill="#2D6A4F"/>
+  <rect x="58" y="38" width="12" height="22" rx="6" fill="#2D6A4F"/>
+  <!-- Espinas -->
+  <line x1="43" y1="35" x2="38" y2="32" stroke="#E9D8A6" stroke-width="1.5"/>
+  <line x1="57" y1="40" x2="62" y2="37" stroke="#E9D8A6" stroke-width="1.5"/>
+  <line x1="43" y1="50" x2="38" y2="48" stroke="#E9D8A6" stroke-width="1.5"/>
+  <line x1="57" y1="55" x2="62" y2="53" stroke="#E9D8A6" stroke-width="1.5"/>
+  <!-- Flor -->
+  <circle cx="50" cy="25" r="4" fill="#E76F51"/>
+</svg>
