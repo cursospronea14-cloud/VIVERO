@@ -91,10 +91,6 @@ export default function LoginPage() {
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
-
-        <p className="text-center text-xs text-gris-suave mt-6">
-          Sistema de gestión de vivero
-        </p>
       </div>
     </div>
   )
