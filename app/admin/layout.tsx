@@ -37,17 +37,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-agave"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-verde-oscuro"></div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <aside className="fixed left-0 top-0 h-full w-64 bg-agave text-white shadow-xl">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-verde-oscuro text-white shadow-xl">
         <div className="p-4 border-b border-white/20">
-          <h1 className="text-xl font-bold">Florece Admin</h1>
-          <p className="text-xs text-arena mt-1">Panel de control</p>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🌵</span>
+            <h1 className="text-xl font-bold">Florece</h1>
+          </div>
+          <p className="text-xs text-arena mt-1">Panel de Administración</p>
         </div>
         <nav className="p-4 space-y-1">
           {navItems.map((item) => (
