@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import Image from 'next/image'
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -37,20 +38,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-verde-oscuro"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B4332]"></div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <aside className="fixed left-0 top-0 h-full w-64 bg-verde-oscuro text-white shadow-xl">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl">
         <div className="p-4 border-b border-white/20">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🌵</span>
-            <h1 className="text-xl font-bold">Florece</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-full overflow-hidden">
+              <Image src="/logo.png" alt="Logo" width={40} height={40} className="object-cover" />
+            </div>
+            <div>
+              <h1 className="font-bold">Florece</h1>
+              <p className="text-xs text-white/60">Panel Admin</p>
+            </div>
           </div>
-          <p className="text-xs text-arena mt-1">Panel de Administración</p>
         </div>
         <nav className="p-4 space-y-1">
           {navItems.map((item) => (
