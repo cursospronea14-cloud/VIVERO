@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
-import './globals.css'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+import './globals.css'  // <-- Debe estar importado
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
@@ -16,12 +14,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body>
-        <Header />
-        <main className="min-h-screen">
-          {children}
-        </main>
-        <Footer />
+      <body className="bg-hueso text-gris-texto font-sans">
+        {children}
         <Toaster position="bottom-right" />
       </body>
     </html>
