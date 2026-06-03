@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, supabaseAdmin } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'  // <-- Importar desde el archivo separado
 import toast from 'react-hot-toast'
 
 interface Employee {
