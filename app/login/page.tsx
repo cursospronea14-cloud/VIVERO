@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -27,7 +26,6 @@ export default function LoginPage() {
       return
     }
 
-    // Verificar el rol del usuario
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -58,45 +56,35 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gris-texto mb-1">
-              Correo electrónico
-            </label>
+            <label className="block text-sm font-medium text-gris-texto mb-1">Correo electrónico</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-agave focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-agave"
               placeholder="admin@florece.com"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gris-texto mb-1">
-              Contraseña
-            </label>
+            <label className="block text-sm font-medium text-gris-texto mb-1">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-agave focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-agave"
               placeholder="••••••••"
             />
           </div>
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-agave text-white py-2 rounded-lg font-semibold hover:bg-opacity-90 transition disabled:opacity-50"
+            className="w-full bg-agave text-white py-2 rounded-lg font-semibold hover:bg-opacity-90 disabled:opacity-50"
           >
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
-
-        <p className="text-center text-xs text-gris-suave mt-6">
-          Sistema de gestión de vivero
-        </p>
       </div>
     </div>
   )
