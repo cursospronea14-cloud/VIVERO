@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase, supabaseAdmin } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import toast from 'react-hot-toast'
 
 interface Employee {
@@ -54,20 +55,26 @@ export default function AdminEmpleados() {
   }, [])
 
   async function fetchEmployees() {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name')
+    try {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name')
 
-    if (profiles) {
-      const { data: users } = await supabaseAdmin.auth.admin.listUsers()
-      const employeesWithEmail = profiles.map(profile => ({
-        ...profile,
-        email: users?.users.find(u => u.id === profile.id)?.email || '',
-      }))
-      setEmployees(employeesWithEmail)
+      if (profiles) {
+        const { data: users } = await supabaseAdmin.auth.admin.listUsers()
+        const employeesWithEmail = profiles.map(profile => ({
+          ...profile,
+          email: users?.users.find(u => u.id === profile.id)?.email || '',
+        }))
+        setEmployees(employeesWithEmail)
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+      toast.error('Error al cargar empleados')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function fetchBranches() {
@@ -81,34 +88,38 @@ export default function AdminEmpleados() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: formData.email,
-      password: formData.password,
-      email_confirm: true,
-    })
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: formData.email,
+        password: formData.password,
+        email_confirm: true,
+      })
 
-    if (authError) {
-      toast.error('Error al crear usuario: ' + authError.message)
-      return
-    }
+      if (authError) {
+        toast.error('Error al crear usuario: ' + authError.message)
+        return
+      }
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert([{
-        id: authData.user.id,
-        full_name: formData.full_name,
-        role: formData.role,
-        branch_id: formData.branch_id || null,
-        is_active: true,
-      }])
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: authData.user.id,
+          full_name: formData.full_name,
+          role: formData.role,
+          branch_id: formData.branch_id || null,
+          is_active: true,
+        }])
 
-    if (profileError) {
-      toast.error('Error al crear perfil')
-    } else {
-      toast.success('Empleado creado')
-      fetchEmployees()
-      setShowModal(false)
-      setFormData({ email: '', password: '', full_name: '', role: 'vendedor', branch_id: 0 })
+      if (profileError) {
+        toast.error('Error al crear perfil')
+      } else {
+        toast.success('Empleado creado')
+        fetchEmployees()
+        setShowModal(false)
+        setFormData({ email: '', password: '', full_name: '', role: 'vendedor', branch_id: 0 })
+      }
+    } catch (error) {
+      toast.error('Error inesperado')
     }
   }
 
@@ -206,7 +217,6 @@ export default function AdminEmpleados() {
         </div>
       </div>
 
-      {/* Modal de nuevo empleado */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
