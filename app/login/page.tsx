@@ -107,6 +107,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-xs text-gray-400">
           <p>Sistema de gestión de vivero</p>
+          <p className="mt-1">© 2026 Florece</p>
         </div>
       </div>
     </div>
