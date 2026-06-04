@@ -17,33 +17,52 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log('1. Intentando login con:', email)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error('2. Error de autenticación:', error)
         toast.error('Correo o contraseña incorrectos')
         setLoading(false)
         return
       }
 
+      console.log('3. Usuario autenticado:', data.user?.id)
+
       if (data?.user) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, full_name')
           .eq('id', data.user.id)
           .single()
 
-        toast.success('Bienvenido al sistema')
+        if (profileError) {
+          console.error('4. Error obteniendo perfil:', profileError)
+          toast.error('Error al obtener el perfil del usuario')
+          setLoading(false)
+          return
+        }
 
+        console.log('5. Perfil encontrado:', profile)
+        console.log('6. Rol del usuario:', profile?.role)
+
+        toast.success(`Bienvenido ${profile?.full_name || 'Usuario'}`)
+
+        // Redirigir según el rol
         if (profile?.role === 'admin' || profile?.role === 'gerente') {
+          console.log('7. Redirigiendo a /admin')
           router.push('/admin')
         } else {
+          console.log('7. Redirigiendo a /pos')
           router.push('/pos')
         }
       }
     } catch (err) {
+      console.error('Error inesperado:', err)
       toast.error('Error inesperado')
     } finally {
       setLoading(false)
