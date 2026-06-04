@@ -31,6 +31,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.push('/login')
       return
     }
+    
+    // Verificar rol
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+    
+    if (profile?.role !== 'admin' && profile?.role !== 'gerente') {
+      router.push('/pos')
+      return
+    }
+    
     setLoading(false)
   }
 
@@ -44,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl z-50">
         <div className="p-4 border-b border-white/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-full overflow-hidden flex items-center justify-center">
@@ -69,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
         </div>
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-80px)]">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -85,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20 bg-[#1B4332]">
           <button
             onClick={() => supabase.auth.signOut()}
             className="flex items-center gap-3 text-white/80 hover:text-white w-full px-4 py-2 rounded-xl hover:bg-white/10 transition"
@@ -96,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      <main className="ml-64 p-8">
+      <main className="ml-64 p-8 min-h-screen">
         {children}
       </main>
     </div>
