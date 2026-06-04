@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Florece - Cactus y Suculentas',
   description: 'Sistema de gestión de vivero',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/logo.png',
   },
 }
 
