@@ -54,11 +54,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1B4332]/10 to-[#E9D8A6]/20">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-[#1B4332] rounded-full flex items-center justify-center mx-auto mb-4">
-            <img src="/logo.jpg" alt="Logo" className="w-16 h-16 rounded-full object-cover" />
+          <div className="w-20 h-20 bg-[#1B4332] rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
+            <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-[#1B4332]">FLORECE</h1>
           <p className="text-gray-500 text-sm">Cactus & Suculentas</p>
+          <p className="text-xs italic text-gray-400 mt-2">"Dios hace florecer el desierto"</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
