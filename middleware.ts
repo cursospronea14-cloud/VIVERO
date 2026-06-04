@@ -36,16 +36,26 @@ export async function middleware(req: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  const isAuthPage = req.nextUrl.pathname === '/login'
-  const isAdminPage = req.nextUrl.pathname.startsWith('/admin')
-  const isPosPage = req.nextUrl.pathname.startsWith('/pos')
+  const path = req.nextUrl.pathname
+  const isAuthPage = path === '/login'
+  const isAdminPage = path.startsWith('/admin')
+  const isPosPage = path.startsWith('/pos')
+  const isPublicPath = path === '/' || path === '/favicon.ico' || path.startsWith('/_next') || path.startsWith('/logo')
 
+  // Permitir rutas públicas
+  if (isPublicPath) {
+    return response
+  }
+
+  // Si no hay sesión y no está en login, redirigir a login
   if (!session && !isAuthPage) {
     const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Si hay sesión y está en login, redirigir según rol
   if (session && isAuthPage) {
+    // Obtener el rol del usuario
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -59,6 +69,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Verificar acceso a admin
   if (isAdminPage && session) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -75,5 +86,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.jpg).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.jpg|logo.png).*)'],
 }
