@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Image from 'next/image'
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -49,7 +48,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 border-b border-white/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-full overflow-hidden flex items-center justify-center">
-              <Image src="/logo.svg" alt="Logo" width={32} height={32} />
+              <img 
+                src="/logo.png" 
+                alt="Logo" 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    parent.style.backgroundColor = '#1B4332'
+                    parent.innerHTML = '<span class="text-white text-lg">🌵</span>'
+                  }
+                }}
+              />
             </div>
             <div>
               <h1 className="font-bold">FLORECE</h1>
