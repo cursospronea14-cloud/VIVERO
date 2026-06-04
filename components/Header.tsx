@@ -37,6 +37,9 @@ export default function Header() {
               <Link href="/#cactus" className="hover:text-arena transition">Cactus</Link>
               <Link href="/#suculentas" className="hover:text-arena transition">Suculentas</Link>
               <Link href="/insumos" className="hover:text-arena transition">Insumos</Link>
+              <Link href="/login" className="hover:text-arena transition flex items-center gap-1">
+                🔐 Acceso empleados
+              </Link>
             </nav>
 
             <div className="flex items-center gap-4">
