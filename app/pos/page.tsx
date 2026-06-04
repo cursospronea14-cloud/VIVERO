@@ -1,9 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-export const revalidate = 0
-
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useCartStore } from '@/lib/store'
@@ -14,90 +10,173 @@ interface Product {
   name: string
   base_price: number
   image_url: string
+  sku: string
 }
 
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [employeeName, setEmployeeName] = useState('')
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
 
   useEffect(() => {
+    fetchUser()
+    fetchCategories()
     fetchProducts()
   }, [])
 
-  async function fetchProducts() {
-    try {
-      const { data } = await supabase
-        .from('products')
-        .select('id, name, base_price, image_url')
-        .eq('is_active', true)
-        .order('name')
-      
-      if (data) setProducts(data)
-    } catch (error) {
-      console.error('Error fetching products:', error)
-      toast.error('Error al cargar productos')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    fetchProducts()
+  }, [selectedCategory])
+
+  async function fetchUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      if (profile) setEmployeeName(profile.full_name || 'Empleado')
     }
   }
 
+  async function fetchCategories() {
+    const { data } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('display_order')
+    if (data) setCategories(data)
+  }
+
+  async function fetchProducts() {
+    setLoading(true)
+    let query = supabase
+      .from('products')
+      .select('id, name, base_price, image_url, sku')
+      .eq('is_active', true)
+
+    if (selectedCategory) {
+      query = query.eq('category_id', selectedCategory)
+    }
+
+    const { data } = await query
+    if (data) setProducts(data)
+    setLoading(false)
+  }
+
   const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.sku?.toLowerCase().includes(search.toLowerCase())
   )
 
   const subtotal = getTotal()
   const iva = subtotal * 0.12
-  const isr = subtotal * 0.05
-  const total = subtotal + iva + isr
+  const total = subtotal + iva
 
-  const handlePayment = () => {
+  const handlePayment = (method: 'cash' | 'card' | 'transfer') => {
     if (items.length === 0) {
       toast.error('Agrega productos primero')
       return
     }
-    toast.success(`Venta registrada: Q${total.toFixed(2)}`)
+
+    // Aquí se guardaría la venta en la base de datos
+    toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
     clearCart()
   }
 
+  const handleQuickAdd = (product: Product, quantity: number = 1) => {
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.base_price,
+      quantity: quantity,
+    })
+    toast.success(`${product.name} agregado`)
+  }
+
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      <div className="bg-agave text-white p-4">
-        <h1 className="text-xl font-bold">Punto de Venta - Florece</h1>
-        <p className="text-sm text-arena">POS para empleados</p>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-[#1B4332] text-white sticky top-0 z-10 shadow-lg">
+        <div className="px-6 py-3 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold">Punto de Venta</h1>
+            <p className="text-sm text-white/70">Atendiendo: {employeeName || 'Cargando...'}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-white/70">Florece - Cactus y Suculentas</p>
+            <p className="text-xs text-white/50">{new Date().toLocaleString()}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col p-4">
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-3 border rounded-lg mb-4 text-lg"
-            autoFocus
-          />
+      <div className="flex h-[calc(100vh-70px)]">
+        {/* Panel izquierdo: productos */}
+        <div className="flex-1 flex flex-col p-4 overflow-hidden">
+          {/* Buscador */}
+          <div className="mb-4">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              <input
+                type="text"
+                placeholder="Buscar por nombre o código..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332] text-lg"
+                autoFocus
+              />
+            </div>
+          </div>
 
+          {/* Categorías rápidas */}
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition ${selectedCategory === null ? 'bg-[#1B4332] text-white' : 'bg-white text-[#1B4332] border border-[#1B4332]'}`}
+            >
+              Todos
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition ${selectedCategory === cat.id ? 'bg-[#1B4332] text-white' : 'bg-white text-[#1B4332] border border-[#1B4332]'}`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Grid de productos */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="text-center py-12">Cargando...</div>
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B4332]"></div>
+              </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {filteredProducts.map((product) => (
                   <button
                     key={product.id}
-                    onClick={() => addItem({
-                      id: product.id,
-                      name: product.name,
-                      price: product.base_price,
-                      quantity: 1,
-                    })}
-                    className="bg-white p-3 rounded-lg shadow hover:shadow-md transition text-left"
+                    onClick={() => handleQuickAdd(product)}
+                    className="bg-white p-3 rounded-xl shadow hover:shadow-md transition text-left group"
                   >
-                    <div className="text-2xl mb-1">🌵</div>
-                    <div className="font-semibold text-sm truncate">{product.name}</div>
-                    <div className="text-agave font-bold">Q{product.base_price.toFixed(2)}</div>
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-16 h-16 bg-[#F5F5F0] rounded-full flex items-center justify-center mb-2 group-hover:bg-[#E9D8A6]/30 transition">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-12 h-12 object-cover rounded-full" />
+                        ) : (
+                          <span className="text-3xl">🌵</span>
+                        )}
+                      </div>
+                      <p className="font-medium text-sm truncate w-full">{product.name}</p>
+                      <p className="text-[#1B4332] font-bold text-sm mt-1">Q{product.base_price.toFixed(2)}</p>
+                      {product.sku && <p className="text-xs text-gray-400">{product.sku}</p>}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -105,39 +184,45 @@ export default function PosPage() {
           </div>
         </div>
 
-        <div className="w-96 bg-white border-l flex flex-col">
-          <div className="p-4 border-b bg-agave text-white">
-            <h2 className="font-bold">Carrito de venta</h2>
+        {/* Panel derecho: carrito */}
+        <div className="w-96 bg-white border-l flex flex-col shadow-lg">
+          <div className="p-4 bg-[#1B4332] text-white">
+            <h2 className="font-bold text-lg">Carrito de venta</h2>
+            <p className="text-xs text-white/70">{items.length} productos</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
             {items.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">Sin productos</p>
+              <div className="text-center py-12">
+                <span className="text-5xl block mb-3">🛒</span>
+                <p className="text-gray-400">Carrito vacío</p>
+                <p className="text-xs text-gray-400 mt-1">Selecciona productos para comenzar</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {items.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center border-b pb-2">
+                  <div key={item.id} className="flex items-center justify-between border-b pb-3">
                     <div className="flex-1">
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="text-sm text-gray-500">Q{item.price.toFixed(2)} c/u</p>
+                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="text-xs text-gray-500">Q{item.price.toFixed(2)} c/u</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="w-8 h-8 bg-gray-200 rounded"
+                        className="w-7 h-7 bg-gray-100 rounded-full hover:bg-gray-200"
                       >
                         -
                       </button>
-                      <span className="w-8 text-center">{item.quantity}</span>
+                      <span className="w-8 text-center font-medium">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-8 h-8 bg-gray-200 rounded"
+                        className="w-7 h-7 bg-gray-100 rounded-full hover:bg-gray-200"
                       >
                         +
                       </button>
                       <button
                         onClick={() => removeItem(item.id)}
-                        className="ml-2 text-red-500"
+                        className="ml-2 text-red-500 text-lg hover:text-red-700"
                       >
                         🗑️
                       </button>
@@ -148,40 +233,52 @@ export default function PosPage() {
             )}
           </div>
 
-          <div className="border-t p-4 space-y-2">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
+          <div className="border-t p-4 space-y-3 bg-gray-50">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Subtotal</span>
               <span>Q{subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>IVA 12%</span>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">IVA (12%)</span>
               <span>Q{iva.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>ISR 5%</span>
-              <span>Q{isr.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>TOTAL</span>
-              <span className="text-flor">Q{total.toFixed(2)}</span>
+              <span className="text-[#1B4332]">Q{total.toFixed(2)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button className="bg-gray-300 py-3 rounded-lg font-semibold">
-                Efectivo
+            <div className="grid grid-cols-3 gap-2 pt-4">
+              <button
+                onClick={() => handlePayment('cash')}
+                disabled={items.length === 0}
+                className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
+              >
+                💵 Efectivo
               </button>
-              <button className="bg-gray-300 py-3 rounded-lg font-semibold">
-                Tarjeta
+              <button
+                onClick={() => handlePayment('card')}
+                disabled={items.length === 0}
+                className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
+              >
+                💳 Tarjeta
+              </button>
+              <button
+                onClick={() => handlePayment('transfer')}
+                disabled={items.length === 0}
+                className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
+              >
+                📱 Transferencia
               </button>
             </div>
 
-            <button
-              onClick={handlePayment}
-              disabled={items.length === 0}
-              className="w-full bg-flor text-white py-3 rounded-lg font-semibold mt-2 disabled:opacity-50"
-            >
-              Cobrar
-            </button>
+            {items.length > 0 && (
+              <button
+                onClick={() => clearCart()}
+                className="w-full text-red-500 text-sm py-1 hover:underline"
+              >
+                Vaciar carrito
+              </button>
+            )}
           </div>
         </div>
       </div>
