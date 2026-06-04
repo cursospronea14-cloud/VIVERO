@@ -34,56 +34,49 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      console.log('1. Intentando login con:', email)
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error('2. Error de autenticación:', error)
         toast.error('Correo o contraseña incorrectos')
         setLoading(false)
         return
       }
 
-      console.log('3. Usuario autenticado:', data.user?.id)
+      if (data?.user) {
+        // Consulta directa sin filtrar por RLS
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', data.user.id)
+          .maybeSingle()
 
-      // Obtener el rol del usuario
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single()
+        if (profileError) {
+          console.error('Profile error:', profileError)
+          toast.error('Error al obtener perfil')
+          setLoading(false)
+          return
+        }
 
-      if (profileError) {
-        console.error('4. Error obteniendo perfil:', profileError)
-        toast.error('Error al obtener el perfil del usuario')
-        setLoading(false)
-        return
+        if (!profile) {
+          toast.error('Perfil no encontrado. Contacta al administrador.')
+          setLoading(false)
+          return
+        }
+
+        toast.success(`Bienvenido ${profile.full_name || 'Usuario'}`)
+
+        if (profile.role === 'admin' || profile.role === 'gerente') {
+          router.push('/admin')
+        } else {
+          router.push('/pos')
+        }
       }
-
-      console.log('5. Perfil encontrado:', profile)
-      console.log('6. Rol del usuario:', profile.role)
-
-      toast.success(`Bienvenido ${profile.full_name || 'Usuario'}`)
-
-      // Redirigir según el rol
-      if (profile.role === 'admin' || profile.role === 'gerente') {
-        console.log('7. Redirigiendo a /admin')
-        router.push('/admin')
-      } else if (profile.role === 'vendedor') {
-        console.log('7. Redirigiendo a /pos')
-        router.push('/pos')
-      } else {
-        console.log('7. Rol desconocido, redirigiendo a /pos')
-        router.push('/pos')
-      }
-
     } catch (err) {
-      console.error('Error inesperado:', err)
-      toast.error('Error inesperado al iniciar sesión')
+      console.error('Login error:', err)
+      toast.error('Error inesperado')
     } finally {
       setLoading(false)
     }
