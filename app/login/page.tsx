@@ -80,10 +80,10 @@ export default function LoginPage() {
         />
         
         <div className="text-center max-w-md relative z-10">
-          {/* Logo */}
+          {/* Logo con logo.jpg */}
           <div className="w-28 h-28 mx-auto mb-6 bg-white rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
             <img 
-              src="/logo.png" 
+              src="/logo.jpg" 
               alt="Florece Logo"
               className="object-cover w-full h-full"
               onError={(e) => {
