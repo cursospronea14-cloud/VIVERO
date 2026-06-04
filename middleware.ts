@@ -38,21 +38,38 @@ export async function middleware(req: NextRequest) {
 
   const path = req.nextUrl.pathname
 
+  // Rutas públicas (accesibles sin login)
   const isPublicPath = 
-    path === '/' || 
-    path === '/login' || 
-    path.startsWith('/_next') || 
-    path.startsWith('/favicon') || 
+    path === '/' ||                    // Catálogo público
+    path === '/login' ||               // Página de login
+    path.startsWith('/product/') ||    // Detalle de producto público
+    path.startsWith('/_next') ||       // Recursos internos
+    path.startsWith('/favicon') ||
     path.startsWith('/logo') ||
-    path.includes('.')
+    path.includes('.')                 // Archivos estáticos (jpg, png, css, etc.)
 
+  // Si es ruta pública, permitir acceso
   if (isPublicPath) {
     return response
   }
 
+  // Si no hay sesión y la ruta es protegida, redirigir a login
   if (!session) {
     const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // Si hay sesión, verificar roles para rutas de admin
+  if (path.startsWith('/admin')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (profile?.role !== 'admin' && profile?.role !== 'gerente') {
+      return NextResponse.redirect(new URL('/pos', req.url))
+    }
   }
 
   return response
