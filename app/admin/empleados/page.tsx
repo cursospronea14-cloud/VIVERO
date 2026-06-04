@@ -25,11 +25,20 @@ export default function AdminEmpleados() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     full_name: '',
     role: 'vendedor',
+    branch_id: 0,
+  })
+  const [editFormData, setEditFormData] = useState({
+    full_name: '',
+    role: '',
     branch_id: 0,
   })
 
@@ -123,6 +132,55 @@ export default function AdminEmpleados() {
     }
   }
 
+  async function handleUpdateEmployee(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedEmployee) return
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editFormData.full_name,
+          role: editFormData.role,
+          branch_id: editFormData.branch_id || null,
+        })
+        .eq('id', selectedEmployee.id)
+
+      if (error) {
+        toast.error('Error al actualizar empleado')
+      } else {
+        toast.success('Empleado actualizado')
+        fetchEmployees()
+        setShowEditModal(false)
+        setSelectedEmployee(null)
+      }
+    } catch (error) {
+      toast.error('Error inesperado')
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!selectedEmployee) return
+
+    try {
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(
+        selectedEmployee.id,
+        { password: resetPassword }
+      )
+
+      if (error) {
+        toast.error('Error al resetear contraseña')
+      } else {
+        toast.success('Contraseña actualizada')
+        setShowResetModal(false)
+        setResetPassword('')
+        setSelectedEmployee(null)
+      }
+    } catch (error) {
+      toast.error('Error inesperado')
+    }
+  }
+
   async function toggleStatus(employee: Employee) {
     const { error } = await supabase
       .from('profiles')
@@ -135,6 +193,22 @@ export default function AdminEmpleados() {
       toast.success(`Empleado ${employee.is_active ? 'desactivado' : 'activado'}`)
       fetchEmployees()
     }
+  }
+
+  function openEditModal(employee: Employee) {
+    setSelectedEmployee(employee)
+    setEditFormData({
+      full_name: employee.full_name,
+      role: employee.role,
+      branch_id: employee.branch_id || 0,
+    })
+    setShowEditModal(true)
+  }
+
+  function openResetModal(employee: Employee) {
+    setSelectedEmployee(employee)
+    setResetPassword('')
+    setShowResetModal(true)
   }
 
   if (loading) {
@@ -166,12 +240,12 @@ export default function AdminEmpleados() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Empleado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Rol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Sucursal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Empleado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Rol</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Sucursal</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -206,9 +280,14 @@ export default function AdminEmpleados() {
                     </button>
                   </td>
                   <td className="px-6 py-4">
-                    <button className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
-                      ✏️
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => openEditModal(emp)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
+                        ✏️
+                      </button>
+                      <button onClick={() => openResetModal(emp)} className="text-blue-500 hover:text-blue-700 transition" title="Resetear contraseña">
+                        🔑
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -217,6 +296,7 @@ export default function AdminEmpleados() {
         </div>
       </div>
 
+      {/* Modal de nuevo empleado */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
@@ -287,6 +367,92 @@ export default function AdminEmpleados() {
                 <button type="submit" className="px-4 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F]">Crear empleado</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edición */}
+      {showEditModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">Editar empleado</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
+            </div>
+            <form onSubmit={handleUpdateEmployee} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Nombre completo</label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.full_name}
+                  onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Rol</label>
+                <select
+                  value={editFormData.role}
+                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                >
+                  <option value="admin">Administrador</option>
+                  <option value="gerente">Gerente</option>
+                  <option value="vendedor">Vendedor (POS)</option>
+                  <option value="bodeguero">Bodeguero</option>
+                  <option value="fumigador">Fumigador</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Sucursal</label>
+                <select
+                  value={editFormData.branch_id}
+                  onChange={(e) => setEditFormData({ ...editFormData, branch_id: parseInt(e.target.value) })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                >
+                  <option value={0}>Sin asignar</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F]">Guardar cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de resetear contraseña */}
+      {showResetModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">Resetear contraseña</h2>
+              <button onClick={() => setShowResetModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-[#6B6B6B]">
+                Empleado: <span className="font-semibold text-[#1B4332]">{selectedEmployee.full_name}</span>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Nueva contraseña</label>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                  placeholder="Ingrese nueva contraseña"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button onClick={() => setShowResetModal(false)} className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50">Cancelar</button>
+                <button onClick={handleResetPassword} className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Resetear</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
