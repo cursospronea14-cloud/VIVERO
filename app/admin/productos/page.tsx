@@ -29,6 +29,8 @@ export default function AdminProductos() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -39,8 +41,6 @@ export default function AdminProductos() {
     is_active: true,
     sku: '',
   })
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     fetchProducts()
@@ -106,7 +106,7 @@ export default function AdminProductos() {
         .from('products')
         .update(productData)
         .eq('id', editingProduct.id)
-      
+
       if (error) {
         toast.error('Error al actualizar producto')
       } else {
@@ -118,7 +118,7 @@ export default function AdminProductos() {
       const { error } = await supabase
         .from('products')
         .insert([productData])
-      
+
       if (error) {
         toast.error('Error al crear producto')
       } else {
@@ -136,13 +136,27 @@ export default function AdminProductos() {
         .from('products')
         .delete()
         .eq('id', id)
-      
+
       if (error) {
         toast.error('Error al eliminar producto')
       } else {
         toast.success('Producto eliminado')
         fetchProducts()
       }
+    }
+  }
+
+  async function handleToggleStatus(product: Product) {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: !product.is_active })
+      .eq('id', product.id)
+
+    if (error) {
+      toast.error('Error al cambiar estado')
+    } else {
+      toast.success(`Producto ${product.is_active ? 'desactivado' : 'activado'}`)
+      fetchProducts()
     }
   }
 
@@ -176,19 +190,35 @@ export default function AdminProductos() {
     setShowModal(true)
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-GT', {
+      style: 'currency',
+      currency: 'GTQ',
+      minimumFractionDigits: 2,
+    }).format(amount)
+  }
+
   if (loading) {
-    return <div className="text-center py-12">Cargando productos...</div>
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B4332]"></div>
+      </div>
+    )
   }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gris-texto">Productos</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#1B4332]">Productos</h1>
+          <p className="text-[#6B6B6B] text-sm mt-1">Gestiona el catálogo de plantas e insumos</p>
+        </div>
         <button
           onClick={() => openModal()}
-          className="bg-agave text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+          className="bg-[#1B4332] text-white px-4 py-2 rounded-xl hover:bg-[#2D6A4F] transition flex items-center gap-2"
         >
-          + Nuevo producto
+          <span>+</span>
+          Nuevo producto
         </button>
       </div>
 
@@ -197,48 +227,62 @@ export default function AdminProductos() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Imagen</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Nombre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Precio</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Costo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Margen</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Imagen</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Nombre</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Precio</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Costo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Margen</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {products.map((product) => {
-                const margin = product.cost_price > 0 
+                const margin = product.cost_price > 0
                   ? ((product.base_price - product.cost_price) / product.base_price * 100).toFixed(1)
                   : 0
                 return (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       {product.image_url ? (
-                        <Image src={product.image_url} alt={product.name} width={40} height={40} className="w-10 h-10 object-cover rounded" />
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        </div>
                       ) : (
-                        <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">🌵</div>
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                          <span className="text-lg">🌵</span>
+                        </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-medium">{product.name}</td>
-                    <td className="px-6 py-4 text-sm text-gris-suave">{product.sku || '-'}</td>
-                    <td className="px-6 py-4 text-agave font-medium">Q{product.base_price.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm">Q{product.cost_price.toFixed(2)}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs rounded-full ${Number(margin) >= 50 ? 'bg-exito/20 text-exito' : 'bg-peligro/20 text-peligro'}`}>
+                      <p className="font-medium text-[#2D2D2D]">{product.name}</p>
+                      <p className="text-xs text-[#6B6B6B]">{product.is_plant ? 'Planta' : 'Insumo'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[#6B6B6B]">{product.sku || '-'}</td>
+                    <td className="px-6 py-4 font-medium text-[#1B4332]">{formatCurrency(product.base_price)}</td>
+                    <td className="px-6 py-4 text-sm text-[#6B6B6B]">{formatCurrency(product.cost_price)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full ${Number(margin) >= 50 ? 'bg-green-100 text-green-700' : Number(margin) >= 30 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
                         {margin}%
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs rounded-full ${product.is_active ? 'bg-exito/20 text-exito' : 'bg-gray-200 text-gray-600'}`}>
+                      <button
+                        onClick={() => handleToggleStatus(product)}
+                        className={`px-2 py-1 text-xs rounded-full ${product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
+                      >
                         {product.is_active ? 'Activo' : 'Inactivo'}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button onClick={() => openModal(product)} className="text-flor hover:text-flor/80">✏️</button>
-                        <button onClick={() => handleDelete(product.id)} className="text-peligro hover:text-peligro/80">🗑️</button>
+                        <button onClick={() => openModal(product)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 transition" title="Eliminar">
+                          🗑️
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -252,64 +296,76 @@ export default function AdminProductos() {
       {/* Modal de producto */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+              <button onClick={() => setShowModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nombre *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
-                />
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Nombre *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">SKU (código)</label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                  />
+                </div>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-1">Descripción</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Descripción</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   rows={3}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Precio base (GTQ)</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Precio base (GTQ)</label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     value={formData.base_price}
                     onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Costo (GTQ)</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Costo (GTQ)</label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Categoría</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Categoría</label>
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   >
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -317,68 +373,57 @@ export default function AdminProductos() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">SKU (código)</label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full p-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_plant}
-                      onChange={(e) => setFormData({ ...formData, is_plant: e.target.checked })}
-                      className="rounded"
-                    />
-                    <span className="text-sm">Es planta viva</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="rounded"
-                    />
-                    <span className="text-sm">Activo (visible en tienda)</span>
-                  </label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Tipo</label>
+                  <select
+                    value={formData.is_plant ? 'plant' : 'insumo'}
+                    onChange={(e) => setFormData({ ...formData, is_plant: e.target.value === 'plant' })}
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                  >
+                    <option value="plant">🌵 Planta viva</option>
+                    <option value="insumo">📦 Insumo</option>
+                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Imagen</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Imagen</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 />
                 {editingProduct?.image_url && !imageFile && (
-                  <p className="text-xs text-gris-suave mt-1">Imagen actual: {editingProduct.image_url.split('/').pop()}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Imagen actual cargada</p>
                 )}
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Producto activo (visible en tienda)</span>
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  className="px-5 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="px-4 py-2 bg-agave text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50"
+                  className="px-5 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F] transition disabled:opacity-50"
                 >
-                  {uploading ? 'Guardando...' : 'Guardar'}
+                  {uploading ? 'Guardando...' : 'Guardar producto'}
                 </button>
               </div>
             </form>
