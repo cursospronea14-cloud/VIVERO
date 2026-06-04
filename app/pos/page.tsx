@@ -82,25 +82,12 @@ export default function PosPage() {
       toast.error('Agrega productos primero')
       return
     }
-
-    // Aquí se guardaría la venta en la base de datos
     toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
     clearCart()
   }
 
-  const handleQuickAdd = (product: Product, quantity: number = 1) => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.base_price,
-      quantity: quantity,
-    })
-    toast.success(`${product.name} agregado`)
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <div className="bg-[#1B4332] text-white sticky top-0 z-10 shadow-lg">
         <div className="px-6 py-3 flex justify-between items-center">
           <div>
@@ -115,9 +102,7 @@ export default function PosPage() {
       </div>
 
       <div className="flex h-[calc(100vh-70px)]">
-        {/* Panel izquierdo: productos */}
         <div className="flex-1 flex flex-col p-4 overflow-hidden">
-          {/* Buscador */}
           <div className="mb-4">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
@@ -132,7 +117,6 @@ export default function PosPage() {
             </div>
           </div>
 
-          {/* Categorías rápidas */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -151,7 +135,6 @@ export default function PosPage() {
             ))}
           </div>
 
-          {/* Grid de productos */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center h-64">
@@ -162,7 +145,7 @@ export default function PosPage() {
                 {filteredProducts.map((product) => (
                   <button
                     key={product.id}
-                    onClick={() => handleQuickAdd(product)}
+                    onClick={() => addItem({ id: product.id, name: product.name, price: product.base_price, quantity: 1 })}
                     className="bg-white p-3 rounded-xl shadow hover:shadow-md transition text-left group"
                   >
                     <div className="flex flex-col items-center text-center">
@@ -175,7 +158,6 @@ export default function PosPage() {
                       </div>
                       <p className="font-medium text-sm truncate w-full">{product.name}</p>
                       <p className="text-[#1B4332] font-bold text-sm mt-1">Q{product.base_price.toFixed(2)}</p>
-                      {product.sku && <p className="text-xs text-gray-400">{product.sku}</p>}
                     </div>
                   </button>
                 ))}
@@ -184,7 +166,6 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* Panel derecho: carrito */}
         <div className="w-96 bg-white border-l flex flex-col shadow-lg">
           <div className="p-4 bg-[#1B4332] text-white">
             <h2 className="font-bold text-lg">Carrito de venta</h2>
@@ -196,7 +177,6 @@ export default function PosPage() {
               <div className="text-center py-12">
                 <span className="text-5xl block mb-3">🛒</span>
                 <p className="text-gray-400">Carrito vacío</p>
-                <p className="text-xs text-gray-400 mt-1">Selecciona productos para comenzar</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -207,25 +187,10 @@ export default function PosPage() {
                       <p className="text-xs text-gray-500">Q{item.price.toFixed(2)} c/u</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="w-7 h-7 bg-gray-100 rounded-full hover:bg-gray-200"
-                      >
-                        -
-                      </button>
+                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-100 rounded-full">-</button>
                       <span className="w-8 text-center font-medium">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-7 h-7 bg-gray-100 rounded-full hover:bg-gray-200"
-                      >
-                        +
-                      </button>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="ml-2 text-red-500 text-lg hover:text-red-700"
-                      >
-                        🗑️
-                      </button>
+                      <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 bg-gray-100 rounded-full">+</button>
+                      <button onClick={() => removeItem(item.id)} className="ml-2 text-red-500 text-lg">🗑️</button>
                     </div>
                   </div>
                 ))}
@@ -234,51 +199,15 @@ export default function PosPage() {
           </div>
 
           <div className="border-t p-4 space-y-3 bg-gray-50">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal</span>
-              <span>Q{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">IVA (12%)</span>
-              <span>Q{iva.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-lg pt-2 border-t">
-              <span>TOTAL</span>
-              <span className="text-[#1B4332]">Q{total.toFixed(2)}</span>
-            </div>
-
+            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>Q{subtotal.toFixed(2)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-600">IVA (12%)</span><span>Q{iva.toFixed(2)}</span></div>
+            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>TOTAL</span><span className="text-[#1B4332]">Q{total.toFixed(2)}</span></div>
             <div className="grid grid-cols-3 gap-2 pt-4">
-              <button
-                onClick={() => handlePayment('cash')}
-                disabled={items.length === 0}
-                className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
-              >
-                💵 Efectivo
-              </button>
-              <button
-                onClick={() => handlePayment('card')}
-                disabled={items.length === 0}
-                className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
-              >
-                💳 Tarjeta
-              </button>
-              <button
-                onClick={() => handlePayment('transfer')}
-                disabled={items.length === 0}
-                className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-opacity-90 transition"
-              >
-                📱 Transferencia
-              </button>
+              <button onClick={() => handlePayment('cash')} disabled={items.length === 0} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💵 Efectivo</button>
+              <button onClick={() => handlePayment('card')} disabled={items.length === 0} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💳 Tarjeta</button>
+              <button onClick={() => handlePayment('transfer')} disabled={items.length === 0} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">📱 Transferencia</button>
             </div>
-
-            {items.length > 0 && (
-              <button
-                onClick={() => clearCart()}
-                className="w-full text-red-500 text-sm py-1 hover:underline"
-              >
-                Vaciar carrito
-              </button>
-            )}
+            {items.length > 0 && <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>}
           </div>
         </div>
       </div>
