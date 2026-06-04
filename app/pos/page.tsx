@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useCartStore } from '@/lib/store'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
 interface Product {
@@ -20,7 +21,9 @@ export default function PosPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [employeeName, setEmployeeName] = useState('')
+  const [employeeRole, setEmployeeRole] = useState('')
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
+  const router = useRouter()
 
   useEffect(() => {
     fetchUser()
@@ -33,15 +36,34 @@ export default function PosPage() {
   }, [selectedCategory])
 
   async function fetchUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single()
-      if (profile) setEmployeeName(profile.full_name || 'Empleado')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) {
+          console.error('Error obteniendo perfil:', error)
+          setEmployeeName('Empleado')
+        } else if (profile) {
+          setEmployeeName(profile.full_name || 'Empleado')
+          setEmployeeRole(profile.role || 'vendedor')
+        }
+      }
+    } catch (err) {
+      console.error('Error en fetchUser:', err)
+      setEmployeeName('Empleado')
     }
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    toast.success('Sesión cerrada')
   }
 
   async function fetchCategories() {
@@ -77,31 +99,87 @@ export default function PosPage() {
   const iva = subtotal * 0.12
   const total = subtotal + iva
 
-  const handlePayment = (method: 'cash' | 'card' | 'transfer') => {
+  const handlePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (items.length === 0) {
       toast.error('Agrega productos primero')
       return
     }
-    toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
-    clearCart()
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        toast.error('Usuario no autenticado')
+        return
+      }
+
+      // Generar número de pedido único
+      const orderNumber = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      
+      const { error } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          branch_id: 1,
+          seller_id: user.id,
+          customer_name: 'Cliente de mostrador',
+          items: items.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity
+          })),
+          subtotal: subtotal,
+          iva: iva,
+          isr: 0,
+          total: total,
+          payment_method: method,
+          sale_type: 'pos',
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+        })
+      
+      if (error) {
+        console.error('Error al guardar venta:', error)
+        toast.error('Error al registrar venta: ' + error.message)
+      } else {
+        toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
+        clearCart()
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      toast.error('Error inesperado al registrar venta')
+    }
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Header con botón de cerrar sesión */}
       <div className="bg-[#1B4332] text-white sticky top-0 z-10 shadow-lg">
         <div className="px-6 py-3 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold">Punto de Venta</h1>
             <p className="text-sm text-white/70">Atendiendo: {employeeName || 'Cargando...'}</p>
+            <p className="text-xs text-white/50 capitalize">Rol: {employeeRole || 'vendedor'}</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-white/70">Florece - Cactus y Suculentas</p>
-            <p className="text-xs text-white/50">{new Date().toLocaleString()}</p>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-white/70">Florece - Cactus y Suculentas</p>
+              <p className="text-xs text-white/50">{new Date().toLocaleString()}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+            >
+              <span>🚪</span>
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-70px)]">
+      <div className="flex h-[calc(100vh-85px)]">
+        {/* Panel izquierdo: productos */}
         <div className="flex-1 flex flex-col p-4 overflow-hidden">
           <div className="mb-4">
             <div className="relative">
@@ -166,6 +244,7 @@ export default function PosPage() {
           </div>
         </div>
 
+        {/* Panel derecho: carrito */}
         <div className="w-96 bg-white border-l flex flex-col shadow-lg">
           <div className="p-4 bg-[#1B4332] text-white">
             <h2 className="font-bold text-lg">Carrito de venta</h2>
