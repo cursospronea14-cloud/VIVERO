@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'  // <-- Importar desde el archivo separado
+import { supabase, supabaseAdmin } from '@/lib/supabaseClient'
 import toast from 'react-hot-toast'
 
 interface Employee {
@@ -33,6 +32,22 @@ export default function AdminEmpleados() {
     branch_id: 0,
   })
 
+  const roleNames: Record<string, string> = {
+    admin: 'Administrador',
+    gerente: 'Gerente',
+    vendedor: 'Vendedor POS',
+    bodeguero: 'Bodeguero',
+    fumigador: 'Fumigador',
+  }
+
+  const roleColors: Record<string, string> = {
+    admin: 'bg-purple-100 text-purple-700',
+    gerente: 'bg-blue-100 text-blue-700',
+    vendedor: 'bg-green-100 text-green-700',
+    bodeguero: 'bg-orange-100 text-orange-700',
+    fumigador: 'bg-yellow-100 text-yellow-700',
+  }
+
   useEffect(() => {
     fetchEmployees()
     fetchBranches()
@@ -43,9 +58,8 @@ export default function AdminEmpleados() {
       .from('profiles')
       .select('*')
       .order('full_name')
-    
+
     if (profiles) {
-      // Obtener emails de auth.users (requiere admin)
       const { data: users } = await supabaseAdmin.auth.admin.listUsers()
       const employeesWithEmail = profiles.map(profile => ({
         ...profile,
@@ -66,8 +80,7 @@ export default function AdminEmpleados() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    
-    // Crear usuario en auth
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: formData.email,
       password: formData.password,
@@ -79,7 +92,6 @@ export default function AdminEmpleados() {
       return
     }
 
-    // Crear perfil
     const { error: profileError } = await supabase
       .from('profiles')
       .insert([{
@@ -105,7 +117,7 @@ export default function AdminEmpleados() {
       .from('profiles')
       .update({ is_active: !employee.is_active })
       .eq('id', employee.id)
-    
+
     if (error) {
       toast.error('Error al actualizar estado')
     } else {
@@ -114,33 +126,27 @@ export default function AdminEmpleados() {
     }
   }
 
-  const roleNames: Record<string, string> = {
-    admin: 'Administrador',
-    gerente: 'Gerente',
-    vendedor: 'Vendedor',
-    bodeguero: 'Bodeguero',
-    fumigador: 'Fumigador',
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B4332]"></div>
+      </div>
+    )
   }
-
-  const roleColors: Record<string, string> = {
-    admin: 'bg-purple-100 text-purple-700',
-    gerente: 'bg-blue-100 text-blue-700',
-    vendedor: 'bg-green-100 text-green-700',
-    bodeguero: 'bg-orange-100 text-orange-700',
-    fumigador: 'bg-yellow-100 text-yellow-700',
-  }
-
-  if (loading) return <div className="text-center py-12">Cargando...</div>
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gris-texto">Empleados</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#1B4332]">Empleados</h1>
+          <p className="text-[#6B6B6B] text-sm mt-1">Gestiona el personal del vivero</p>
+        </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-agave text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+          className="bg-[#1B4332] text-white px-4 py-2 rounded-xl hover:bg-[#2D6A4F] transition flex items-center gap-2"
         >
-          + Nuevo empleado
+          <span>+</span>
+          Nuevo empleado
         </button>
       </div>
 
@@ -149,35 +155,48 @@ export default function AdminEmpleados() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Nombre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Rol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Sucursal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Empleado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Rol</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Sucursal</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {employees.map((emp) => (
                 <tr key={emp.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">{emp.full_name}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-[#1B4332]/10 rounded-full flex items-center justify-center">
+                        <span className="text-lg">👤</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-[#2D2D2D]">{emp.full_name}</p>
+                        <p className="text-xs text-[#6B6B6B]">ID: {emp.id.slice(0, 8)}...</p>
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-sm">{emp.email}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-xs rounded-full ${roleColors[emp.role] || 'bg-gray-100'}`}>
                       {roleNames[emp.role] || emp.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">
-                    {branches.find(b => b.id === emp.branch_id)?.name || '-'}
+                  <td className="px-6 py-4 text-sm text-[#6B6B6B]">
+                    {branches.find(b => b.id === emp.branch_id)?.name || 'No asignada'}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs rounded-full ${emp.is_active ? 'bg-exito/20 text-exito' : 'bg-gray-200 text-gray-600'}`}>
+                    <button
+                      onClick={() => toggleStatus(emp)}
+                      className={`px-2 py-1 text-xs rounded-full ${emp.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
+                    >
                       {emp.is_active ? 'Activo' : 'Inactivo'}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-6 py-4">
-                    <button onClick={() => toggleStatus(emp)} className="text-flor hover:text-flor/80">
-                      {emp.is_active ? '🔴 Desactivar' : '🟢 Activar'}
+                    <button className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
+                      ✏️
                     </button>
                   </td>
                 </tr>
@@ -187,63 +206,65 @@ export default function AdminEmpleados() {
         </div>
       </div>
 
+      {/* Modal de nuevo empleado */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold">Nuevo empleado</h2>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">Nuevo empleado</h2>
+              <button onClick={() => setShowModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre completo *</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Nombre completo *</label>
                 <input
                   type="text"
                   required
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email *</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Correo electrónico *</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Contraseña *</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Contraseña *</label>
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Rol</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Rol</label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 >
                   <option value="admin">Administrador</option>
                   <option value="gerente">Gerente</option>
-                  <option value="vendedor">Vendedor</option>
+                  <option value="vendedor">Vendedor (POS)</option>
                   <option value="bodeguero">Bodeguero</option>
                   <option value="fumigador">Fumigador</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Sucursal</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Sucursal</label>
                 <select
                   value={formData.branch_id}
                   onChange={(e) => setFormData({ ...formData, branch_id: parseInt(e.target.value) })}
-                  className="w-full p-2 border rounded-lg"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 >
                   <option value={0}>Sin asignar</option>
                   {branches.map((branch) => (
@@ -252,8 +273,8 @@ export default function AdminEmpleados() {
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-agave text-white rounded-lg">Crear</button>
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F]">Crear empleado</button>
               </div>
             </form>
           </div>
