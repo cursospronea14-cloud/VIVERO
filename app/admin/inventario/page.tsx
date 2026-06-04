@@ -21,12 +21,16 @@ interface Branch {
 export default function AdminInventario() {
   const [stock, setStock] = useState<StockItem[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [products, setProducts] = useState<{ id: number; name: string }[]>([])
   const [selectedBranch, setSelectedBranch] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingStock, setEditingStock] = useState<{ productId: number; branchId: number; quantity: number } | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newStock, setNewStock] = useState({ product_id: 0, branch_id: 0, quantity: 0, location_code: '' })
 
   useEffect(() => {
     fetchBranches()
+    fetchProducts()
   }, [])
 
   useEffect(() => {
@@ -43,9 +47,18 @@ export default function AdminInventario() {
     if (data) setBranches(data)
   }
 
+  async function fetchProducts() {
+    const { data } = await supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name')
+    if (data) setProducts(data)
+  }
+
   async function fetchStock() {
     setLoading(true)
-    
+
     let query = supabase
       .from('branch_stock')
       .select(`
@@ -55,13 +68,13 @@ export default function AdminInventario() {
         product_id,
         products (name)
       `)
-    
+
     if (selectedBranch) {
       query = query.eq('branch_id', selectedBranch)
     }
-    
+
     const { data } = await query
-    
+
     if (data) {
       const formatted: StockItem[] = data.map((item: any) => ({
         branch_id: item.branch_id,
@@ -77,12 +90,17 @@ export default function AdminInventario() {
   }
 
   async function updateStock(productId: number, branchId: number, newQuantity: number) {
+    if (newQuantity < 0) {
+      toast.error('La cantidad no puede ser negativa')
+      return
+    }
+
     const { error } = await supabase
       .from('branch_stock')
       .update({ quantity: newQuantity })
       .eq('product_id', productId)
       .eq('branch_id', branchId)
-    
+
     if (error) {
       toast.error('Error al actualizar stock')
     } else {
@@ -93,19 +111,44 @@ export default function AdminInventario() {
   }
 
   async function addStock() {
-    // Redirigir a productos para crear nuevo producto con stock
-    window.location.href = '/admin/productos'
+    if (!newStock.product_id || !newStock.branch_id) {
+      toast.error('Selecciona producto y sucursal')
+      return
+    }
+
+    const { error } = await supabase
+      .from('branch_stock')
+      .upsert({
+        product_id: newStock.product_id,
+        branch_id: newStock.branch_id,
+        quantity: newStock.quantity,
+        location_code: newStock.location_code,
+      })
+
+    if (error) {
+      toast.error('Error al agregar stock')
+    } else {
+      toast.success('Stock agregado')
+      fetchStock()
+      setShowAddModal(false)
+      setNewStock({ product_id: 0, branch_id: 0, quantity: 0, location_code: '' })
+    }
   }
+
+  const totalStock = stock.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gris-texto">Inventario</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#1B4332]">Inventario</h1>
+          <p className="text-[#6B6B6B] text-sm mt-1">Control de stock por sucursal</p>
+        </div>
         <div className="flex gap-3">
           <select
             value={selectedBranch || ''}
             onChange={(e) => setSelectedBranch(e.target.value ? parseInt(e.target.value) : null)}
-            className="p-2 border rounded-lg"
+            className="p-2 border border-gray-200 rounded-xl text-sm"
           >
             <option value="">Todas las sucursales</option>
             {branches.map((branch) => (
@@ -113,82 +156,87 @@ export default function AdminInventario() {
             ))}
           </select>
           <button
-            onClick={addStock}
-            className="bg-agave text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+            onClick={() => setShowAddModal(true)}
+            className="bg-[#1B4332] text-white px-4 py-2 rounded-xl hover:bg-[#2D6A4F] transition flex items-center gap-2 text-sm"
           >
-            + Agregar producto
+            <span>+</span>
+            Agregar stock
           </button>
         </div>
       </div>
 
+      {/* Resumen rápido */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Total productos</p>
+          <p className="text-2xl font-bold text-[#1B4332]">{stock.length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Unidades en stock</p>
+          <p className="text-2xl font-bold text-[#1B4332]">{totalStock}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Sucursales</p>
+          <p className="text-2xl font-bold text-[#1B4332]">{branches.length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Stock bajo</p>
+          <p className="text-2xl font-bold text-[#E76F51]">{stock.filter(i => i.quantity <= 5).length}</p>
+        </div>
+      </div>
+
+      {/* Tabla de stock */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Producto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Sucursal</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Ubicación</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gris-suave uppercase">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Producto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Sucursal</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Ubicación</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Cantidad</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {stock.map((item) => (
                 <tr key={`${item.product_id}-${item.branch_id}`} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">{item.product_name}</td>
+                  <td className="px-6 py-4 font-medium text-[#2D2D2D]">{item.product_name}</td>
                   <td className="px-6 py-4 text-sm">{item.branch_name}</td>
-                  <td className="px-6 py-4 text-sm text-gris-suave">{item.location_code || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-[#6B6B6B]">{item.location_code || '-'}</td>
                   <td className="px-6 py-4">
                     {editingStock?.productId === item.product_id && editingStock?.branchId === item.branch_id ? (
                       <input
                         type="number"
                         value={editingStock.quantity}
                         onChange={(e) => setEditingStock({ ...editingStock, quantity: parseInt(e.target.value) })}
-                        className="w-24 p-1 border rounded"
+                        className="w-24 p-1 border border-gray-200 rounded-lg"
                         autoFocus
                       />
                     ) : (
-                      <span className={`font-medium ${item.quantity <= 5 ? 'text-peligro' : 'text-agave'}`}>
+                      <span className={`font-medium ${item.quantity <= 5 ? 'text-red-600' : 'text-[#1B4332]'}`}>
                         {item.quantity} unidades
                       </span>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     {item.quantity <= 0 ? (
-                      <span className="px-2 py-1 text-xs rounded-full bg-peligro/20 text-peligro">Agotado</span>
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">Agotado</span>
                     ) : item.quantity <= 5 ? (
                       <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">Stock bajo</span>
                     ) : (
-                      <span className="px-2 py-1 text-xs rounded-full bg-exito/20 text-exito">Normal</span>
+                      <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Normal</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     {editingStock?.productId === item.product_id && editingStock?.branchId === item.branch_id ? (
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => updateStock(item.product_id, item.branch_id, editingStock.quantity)}
-                          className="text-exito"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={() => setEditingStock(null)}
-                          className="text-peligro"
-                        >
-                          ✗
-                        </button>
+                        <button onClick={() => updateStock(item.product_id, item.branch_id, editingStock.quantity)} className="text-green-600">✓</button>
+                        <button onClick={() => setEditingStock(null)} className="text-red-600">✗</button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setEditingStock({
-                          productId: item.product_id,
-                          branchId: item.branch_id,
-                          quantity: item.quantity,
-                        })}
-                        className="text-flor hover:text-flor/80"
-                      >
+                      <button onClick={() => setEditingStock({ productId: item.product_id, branchId: item.branch_id, quantity: item.quantity })} className="text-[#E76F51] hover:text-[#1B4332] transition">
                         ✏️ Editar
                       </button>
                     )}
@@ -199,6 +247,77 @@ export default function AdminInventario() {
           </table>
         </div>
       </div>
+
+      {stock.length === 0 && (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center mt-6">
+          <span className="text-5xl block mb-3">📦</span>
+          <p className="text-[#6B6B6B]">No hay stock registrado</p>
+          <button onClick={() => setShowAddModal(true)} className="mt-3 text-[#1B4332] underline">Agregar stock inicial</button>
+        </div>
+      )}
+
+      {/* Modal agregar stock */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">Agregar stock</h2>
+              <button onClick={() => setShowAddModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Producto</label>
+                <select
+                  value={newStock.product_id}
+                  onChange={(e) => setNewStock({ ...newStock, product_id: parseInt(e.target.value) })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                >
+                  <option value={0}>Seleccionar producto</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Sucursal</label>
+                <select
+                  value={newStock.branch_id}
+                  onChange={(e) => setNewStock({ ...newStock, branch_id: parseInt(e.target.value) })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                >
+                  <option value={0}>Seleccionar sucursal</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Cantidad</label>
+                <input
+                  type="number"
+                  value={newStock.quantity}
+                  onChange={(e) => setNewStock({ ...newStock, quantity: parseInt(e.target.value) })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ubicación (opcional)</label>
+                <input
+                  type="text"
+                  value={newStock.location_code}
+                  onChange={(e) => setNewStock({ ...newStock, location_code: e.target.value })}
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                  placeholder="Ej: A-12, Túnel 3"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-gray-200 rounded-xl">Cancelar</button>
+                <button onClick={addStock} className="px-4 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F]">Agregar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
