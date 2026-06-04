@@ -13,22 +13,13 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value
+        getAll() {
+          return req.cookies.getAll()
         },
-        set(name: string, value: string, options: any) {
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: any) {
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
@@ -38,28 +29,27 @@ export async function middleware(req: NextRequest) {
 
   const path = req.nextUrl.pathname
 
-  // Rutas públicas (accesibles sin login)
+  // Rutas públicas
   const isPublicPath = 
-    path === '/' ||                    // Catálogo público
-    path === '/login' ||               // Página de login
-    path.startsWith('/product/') ||    // Detalle de producto público
-    path.startsWith('/_next') ||       // Recursos internos
+    path === '/' ||
+    path === '/login' ||
+    path.startsWith('/product/') ||
+    path.startsWith('/_next') ||
     path.startsWith('/favicon') ||
     path.startsWith('/logo') ||
-    path.includes('.')                 // Archivos estáticos (jpg, png, css, etc.)
+    path.includes('.')
 
-  // Si es ruta pública, permitir acceso
   if (isPublicPath) {
     return response
   }
 
-  // Si no hay sesión y la ruta es protegida, redirigir a login
+  // Si no hay sesión y la ruta es protegida
   if (!session) {
     const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Si hay sesión, verificar roles para rutas de admin
+  // Verificar rol para admin
   if (path.startsWith('/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
