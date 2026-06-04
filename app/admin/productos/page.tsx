@@ -30,6 +30,7 @@ export default function AdminProductos() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -71,24 +72,49 @@ export default function AdminProductos() {
   }
 
   async function uploadImage(file: File): Promise<string | null> {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Date.now()}.${fileExt}`
-    const filePath = `products/${fileName}`
+    try {
+      // Verificar que el bucket existe
+      const { data: buckets } = await supabase.storage.listBuckets()
+      const bucketExists = buckets?.some(b => b.name === 'product-images')
+      
+      if (!bucketExists) {
+        toast.error('El bucket product-images no existe. Crealo en Supabase Storage.')
+        return null
+      }
+      
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}.${fileExt}`
+      const filePath = `products/${fileName}`
 
-    const { error: uploadError } = await supabase.storage
-      .from('product-images')
-      .upload(filePath, file)
+      // Simular progreso
+      setUploadProgress(0)
+      const interval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 20, 90))
+      }, 200)
 
-    if (uploadError) {
-      toast.error('Error al subir imagen: ' + uploadError.message)
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file)
+
+      clearInterval(interval)
+      setUploadProgress(100)
+
+      if (uploadError) {
+        console.error('Error detallado:', uploadError)
+        toast.error('Error al subir imagen: ' + uploadError.message)
+        return null
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath)
+
+      return publicUrl
+    } catch (err) {
+      console.error('Error en uploadImage:', err)
+      toast.error('Error inesperado al subir imagen')
       return null
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(filePath)
-
-    return publicUrl
   }
 
   function resetForm() {
@@ -104,6 +130,7 @@ export default function AdminProductos() {
     })
     setImageFile(null)
     setEditingProduct(null)
+    setUploadProgress(0)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -142,6 +169,7 @@ export default function AdminProductos() {
     }
 
     if (result.error) {
+      console.error('Error al guardar:', result.error)
       toast.error(`Error: ${result.error.message}`)
     } else {
       toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado')
@@ -150,6 +178,7 @@ export default function AdminProductos() {
       resetForm()
     }
     setUploading(false)
+    setUploadProgress(0)
   }
 
   async function handleDelete(id: number) {
@@ -199,7 +228,16 @@ export default function AdminProductos() {
       resetForm()
     }
     setImageFile(null)
+    setUploadProgress(0)
     setShowModal(true)
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-GT', {
+      style: 'currency',
+      currency: 'GTQ',
+      minimumFractionDigits: 2,
+    }).format(amount)
   }
 
   if (loading) {
@@ -235,115 +273,135 @@ export default function AdminProductos() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Nombre</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">SKU</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Precio</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Costo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Margen</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Estado</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[#6B6B6B] uppercase">Acciones</th>
               </tr>
             </thead>
-            <tbody>
-              {products.map((product) => (
-                <tr key={product.id} className="border-t hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">🌵</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 font-medium">{product.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{product.sku || '-'}</td>
-                  <td className="px-6 py-4 font-medium text-[#1B4332]">Q{product.base_price?.toFixed(2)}</td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => handleToggleStatus(product)}
-                      className={`px-2 py-1 text-xs rounded-full ${product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
-                    >
-                      {product.is_active ? 'Activo' : 'Inactivo'}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button onClick={() => openModal(product)} className="text-[#E76F51] mr-2">✏️</button>
-                    <button onClick={() => handleDelete(product.id)} className="text-red-500">🗑️</button>
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-gray-200">
+              {products.map((product) => {
+                const margin = product.cost_price > 0
+                  ? ((product.base_price - product.cost_price) / product.base_price * 100).toFixed(1)
+                  : 0
+                return (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                          <span className="text-lg">🌵</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-[#2D2D2D]">{product.name}</p>
+                      <p className="text-xs text-[#6B6B6B]">{product.is_plant ? 'Planta' : 'Insumo'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[#6B6B6B]">{product.sku || '-'}</td>
+                    <td className="px-6 py-4 font-medium text-[#1B4332]">{formatCurrency(product.base_price)}</td>
+                    <td className="px-6 py-4 text-sm text-[#6B6B6B]">{formatCurrency(product.cost_price)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full ${Number(margin) >= 50 ? 'bg-green-100 text-green-700' : Number(margin) >= 30 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                        {margin}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleToggleStatus(product)}
+                        className={`px-2 py-1 text-xs rounded-full ${product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
+                      >
+                        {product.is_active ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <button onClick={() => openModal(product)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">✏️</button>
+                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 transition" title="Eliminar">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
-           </table>
+          </table>
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal de producto */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
-              <button onClick={() => setShowModal(false)} className="text-2xl">&times;</button>
+            <div className="p-6 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+              <button onClick={() => setShowModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Nombre *</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Nombre *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">SKU</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">SKU (código)</label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Descripción</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Descripción</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full p-2 border rounded-xl"
+                  className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
                   rows={3}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Precio (GTQ)</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Precio base (GTQ)</label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     value={formData.base_price}
                     onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Costo (GTQ)</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Costo (GTQ)</label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Categoría</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Categoría</label>
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   >
                     <option value={0}>Seleccionar categoría</option>
                     {categories.map((cat) => (
@@ -352,26 +410,37 @@ export default function AdminProductos() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Tipo</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Tipo</label>
                   <select
                     value={formData.is_plant ? 'plant' : 'insumo'}
                     onChange={(e) => setFormData({ ...formData, is_plant: e.target.value === 'plant' })}
-                    className="w-full p-2 border rounded-xl"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   >
-                    <option value="plant">🌵 Planta</option>
+                    <option value="plant">🌵 Planta viva</option>
                     <option value="insumo">📦 Insumo</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Imagen</label>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Imagen</label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="w-full p-2 border rounded-xl"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
                 />
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="mt-2">
+                    <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#1B4332] transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <p className="text-xs text-[#6B6B6B] mt-1">Subiendo... {uploadProgress}%</p>
+                  </div>
+                )}
+                {editingProduct?.image_url && !imageFile && (
+                  <p className="text-xs text-[#6B6B6B] mt-1">Imagen actual cargada</p>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
@@ -380,15 +449,26 @@ export default function AdminProductos() {
                     type="checkbox"
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    className="rounded"
                   />
-                  Activo
+                  <span className="text-sm">Producto activo (visible en tienda)</span>
                 </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-xl">Cancelar</button>
-                <button type="submit" disabled={uploading} className="px-4 py-2 bg-[#1B4332] text-white rounded-xl">
-                  {uploading ? 'Guardando...' : 'Guardar'}
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-5 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="px-5 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F] transition disabled:opacity-50"
+                >
+                  {uploading ? 'Guardando...' : 'Guardar producto'}
                 </button>
               </div>
             </form>
