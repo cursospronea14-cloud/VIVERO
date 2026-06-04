@@ -42,10 +42,7 @@ export default function AdminCategorias() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const slug = formData.slug || formData.name.toLowerCase().replace(/ /g, '-').replace(/[áéíóú]/g, (c) => {
-      const accents: Record<string, string> = { 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u' }
-      return accents[c] || c
-    })
+    const slug = formData.slug || formData.name.toLowerCase().replace(/ /g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
     if (editingCat) {
       const { error } = await supabase
@@ -148,12 +145,8 @@ export default function AdminCategorias() {
                   <p className="text-sm text-[#6B6B6B]">/{cat.slug}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => openModal(cat)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
-                    ✏️
-                  </button>
-                  <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:text-red-700 transition" title="Eliminar">
-                    🗑️
-                  </button>
+                  <button onClick={() => openModal(cat)} className="text-[#E76F51] hover:text-[#1B4332] transition">✏️</button>
+                  <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:text-red-700 transition">🗑️</button>
                 </div>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#E9D8A6]">
@@ -176,7 +169,6 @@ export default function AdminCategorias() {
         </div>
       )}
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
@@ -202,8 +194,8 @@ export default function AdminCategorias() {
                   type="text"
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
-                  placeholder="cactus (se genera automático)"
+                  className="w-full p-2 border border-gray-200 rounded-xl"
+                  placeholder="se genera automático"
                 />
               </div>
               <div>
