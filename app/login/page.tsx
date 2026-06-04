@@ -33,48 +33,60 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      console.log('1. Intentando login con:', email)
 
-    if (error) {
-      toast.error('Correo o contraseña incorrectos')
-      setLoading(false)
-      return
-    }
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (data?.user) {
-      console.log('Usuario logueado:', data.user.id)
-      
+      if (error) {
+        console.error('2. Error de autenticación:', error)
+        toast.error('Correo o contraseña incorrectos')
+        setLoading(false)
+        return
+      }
+
+      console.log('3. Usuario autenticado:', data.user?.id)
+
       // Obtener el rol del usuario
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role')
+        .select('*')
         .eq('id', data.user.id)
         .single()
 
       if (profileError) {
-        console.error('Error obteniendo perfil:', profileError)
+        console.error('4. Error obteniendo perfil:', profileError)
         toast.error('Error al obtener el perfil del usuario')
         setLoading(false)
         return
       }
 
-      console.log('Rol del usuario:', profile?.role)
-      toast.success(`Bienvenido ${profile?.role === 'admin' ? 'Administrador' : 'Empleado'}`)
-      
+      console.log('5. Perfil encontrado:', profile)
+      console.log('6. Rol del usuario:', profile.role)
+
+      toast.success(`Bienvenido ${profile.full_name || 'Usuario'}`)
+
       // Redirigir según el rol
-      if (profile?.role === 'admin' || profile?.role === 'gerente') {
-        console.log('Redirigiendo a /admin')
+      if (profile.role === 'admin' || profile.role === 'gerente') {
+        console.log('7. Redirigiendo a /admin')
         router.push('/admin')
+      } else if (profile.role === 'vendedor') {
+        console.log('7. Redirigiendo a /pos')
+        router.push('/pos')
       } else {
-        console.log('Redirigiendo a /pos')
+        console.log('7. Rol desconocido, redirigiendo a /pos')
         router.push('/pos')
       }
+
+    } catch (err) {
+      console.error('Error inesperado:', err)
+      toast.error('Error inesperado al iniciar sesión')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   const currentCardData = infoCards[currentCard]
