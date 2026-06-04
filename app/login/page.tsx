@@ -44,19 +44,36 @@ export default function LoginPage() {
       return
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user?.id)
-      .single()
+    if (data?.user) {
+      console.log('Usuario logueado:', data.user.id)
+      
+      // Obtener el rol del usuario
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
 
-    if (profile?.role === 'admin' || profile?.role === 'gerente') {
-      router.push('/admin')
-    } else {
-      router.push('/pos')
+      if (profileError) {
+        console.error('Error obteniendo perfil:', profileError)
+        toast.error('Error al obtener el perfil del usuario')
+        setLoading(false)
+        return
+      }
+
+      console.log('Rol del usuario:', profile?.role)
+      toast.success(`Bienvenido ${profile?.role === 'admin' ? 'Administrador' : 'Empleado'}`)
+      
+      // Redirigir según el rol
+      if (profile?.role === 'admin' || profile?.role === 'gerente') {
+        console.log('Redirigiendo a /admin')
+        router.push('/admin')
+      } else {
+        console.log('Redirigiendo a /pos')
+        router.push('/pos')
+      }
     }
-
-    toast.success('Bienvenido al sistema')
+    
     setLoading(false)
   }
 
@@ -80,7 +97,6 @@ export default function LoginPage() {
         />
         
         <div className="text-center max-w-md relative z-10">
-          {/* Logo con logo.jpg */}
           <div className="w-28 h-28 mx-auto mb-6 bg-white rounded-full flex items-center justify-center shadow-2xl overflow-hidden">
             <img 
               src="/logo.jpg" 
@@ -128,7 +144,6 @@ export default function LoginPage() {
       {/* Panel derecho */}
       <div className="w-1/2 bg-[#FDFBF7] flex flex-col justify-center p-12 overflow-y-auto">
         <div className="max-w-md mx-auto w-full">
-          {/* Tarjeta rotativa */}
           <div 
             className="bg-white rounded-2xl shadow-xl p-6 mb-8 border-l-8 transition-all duration-500 hover:shadow-2xl"
             style={{ borderLeftColor: currentCardData.color }}
@@ -150,7 +165,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Formulario */}
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <h2 className="text-2xl font-bold text-[#1B4332] mb-2">Acceso al Sistema</h2>
             <p className="text-[#6B6B6B] text-sm mb-6">Ingresa tus credenciales para continuar</p>
