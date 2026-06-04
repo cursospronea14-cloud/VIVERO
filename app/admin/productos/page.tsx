@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import toast from 'react-hot-toast'
-import Image from 'next/image'
 
 interface Product {
   id: number
@@ -69,12 +68,13 @@ export default function AdminProductos() {
     const fileName = `${Date.now()}.${fileExt}`
     const filePath = `products/${fileName}`
 
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(filePath, file)
 
-    if (error) {
-      toast.error('Error al subir imagen')
+    if (uploadError) {
+      console.error('Error al subir imagen:', uploadError)
+      toast.error('Error al subir imagen: ' + uploadError.message)
       return null
     }
 
@@ -83,6 +83,21 @@ export default function AdminProductos() {
       .getPublicUrl(filePath)
 
     return publicUrl
+  }
+
+  function resetForm() {
+    setFormData({
+      name: '',
+      description: '',
+      base_price: 0,
+      cost_price: 0,
+      category_id: categories[0]?.id || 0,
+      is_plant: true,
+      is_active: true,
+      sku: '',
+    })
+    setImageFile(null)
+    setEditingProduct(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -97,35 +112,37 @@ export default function AdminProductos() {
     }
 
     const productData = {
-      ...formData,
-      image_url: imageUrl,
+      name: formData.name,
+      description: formData.description,
+      base_price: formData.base_price,
+      cost_price: formData.cost_price,
+      category_id: formData.category_id,
+      is_plant: formData.is_plant,
+      is_active: formData.is_active,
+      sku: formData.sku || null,
+      image_url: imageUrl || null,
     }
 
+    let result
     if (editingProduct) {
-      const { error } = await supabase
+      result = await supabase
         .from('products')
         .update(productData)
         .eq('id', editingProduct.id)
-
-      if (error) {
-        toast.error('Error al actualizar producto')
-      } else {
-        toast.success('Producto actualizado')
-        fetchProducts()
-        setShowModal(false)
-      }
     } else {
-      const { error } = await supabase
+      result = await supabase
         .from('products')
         .insert([productData])
+    }
 
-      if (error) {
-        toast.error('Error al crear producto')
-      } else {
-        toast.success('Producto creado')
-        fetchProducts()
-        setShowModal(false)
-      }
+    if (result.error) {
+      console.error('Error al guardar:', result.error)
+      toast.error(`Error: ${result.error.message}`)
+    } else {
+      toast.success(editingProduct ? 'Producto actualizado' : 'Producto creado')
+      fetchProducts()
+      setShowModal(false)
+      resetForm()
     }
     setUploading(false)
   }
@@ -174,17 +191,8 @@ export default function AdminProductos() {
         sku: product.sku || '',
       })
     } else {
-      setEditingProduct(null)
-      setFormData({
-        name: '',
-        description: '',
-        base_price: 0,
-        cost_price: 0,
-        category_id: categories[0]?.id || 0,
-        is_plant: true,
-        is_active: true,
-        sku: '',
-      })
+      resetForm()
+      setFormData(prev => ({ ...prev, category_id: categories[0]?.id || 0 }))
     }
     setImageFile(null)
     setShowModal(true)
@@ -246,9 +254,7 @@ export default function AdminProductos() {
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       {product.image_url ? (
-                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
-                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                        </div>
+                        <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded-lg object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                           <span className="text-lg">🌵</span>
@@ -277,12 +283,8 @@ export default function AdminProductos() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button onClick={() => openModal(product)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">
-                          ✏️
-                        </button>
-                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 transition" title="Eliminar">
-                          🗑️
-                        </button>
+                        <button onClick={() => openModal(product)} className="text-[#E76F51] hover:text-[#1B4332] transition" title="Editar">✏️</button>
+                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-700 transition" title="Eliminar">🗑️</button>
                       </div>
                     </td>
                   </tr>
@@ -319,7 +321,7 @@ export default function AdminProductos() {
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
               </div>
@@ -343,7 +345,7 @@ export default function AdminProductos() {
                     required
                     value={formData.base_price}
                     onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
                 <div>
@@ -354,7 +356,7 @@ export default function AdminProductos() {
                     required
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   />
                 </div>
               </div>
@@ -365,7 +367,7 @@ export default function AdminProductos() {
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   >
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -377,7 +379,7 @@ export default function AdminProductos() {
                   <select
                     value={formData.is_plant ? 'plant' : 'insumo'}
                     onChange={(e) => setFormData({ ...formData, is_plant: e.target.value === 'plant' })}
-                    className="w-full p-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                    className="w-full p-2 border border-gray-200 rounded-xl"
                   >
                     <option value="plant">🌵 Planta viva</option>
                     <option value="insumo">📦 Insumo</option>
