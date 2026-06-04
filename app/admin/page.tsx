@@ -2,20 +2,43 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import Image from 'next/image'
 import Link from 'next/link'
 
+interface DashboardStats {
+  totalProducts: number
+  totalOrders: number
+  totalSales: number
+  lowStock: number
+  monthlySales: number
+  pendingOrders: number
+}
+
+interface RecentOrder {
+  id: number
+  order_number: string
+  customer_name: string
+  total: number
+  status: string
+  created_at: string
+}
+
+interface TopProduct {
+  name: string
+  total: number
+  image_url: string
+}
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
     totalSales: 0,
     lowStock: 0,
     monthlySales: 0,
+    pendingOrders: 0,
   })
-  const [recentOrders, setRecentOrders] = useState<any[]>([])
-  const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
-  const [lowStockProducts, setLowStockProducts] = useState<any[]>([])
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,43 +49,108 @@ export default function AdminDashboard() {
     await Promise.all([
       fetchStats(),
       fetchRecentOrders(),
-      fetchFeaturedProducts(),
-      fetchLowStockProducts(),
+      fetchTopProducts(),
     ])
     setLoading(false)
   }
 
   async function fetchStats() {
-    const { count: productsCount } = await supabase.from('products').select('*', { count: 'exact', head: true })
-    const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true })
-    const { data: salesData } = await supabase.from('orders').select('total, created_at')
-    const totalSales = salesData?.reduce((sum, o) => sum + o.total, 0) || 0
-    
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    const monthlySales = salesData?.filter(o => o.created_at >= startOfMonth).reduce((sum, o) => sum + o.total, 0) || 0
-    
+    // Total productos
+    const { count: productsCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+
+    // Total pedidos y pendientes
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('total, status, created_at')
+
+    const totalOrders = ordersData?.length || 0
+    const pendingOrders = ordersData?.filter(o => o.status === 'pending').length || 0
+    const totalSales = ordersData?.reduce((sum, o) => sum + (o.total || 0), 0) || 0
+
+    // Ventas del mes actual
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+    const monthlySales = ordersData?.filter(o => new Date(o.created_at) >= startOfMonth)
+      .reduce((sum, o) => sum + (o.total || 0), 0) || 0
+
+    // Stock bajo
+    const { data: lowStockData } = await supabase
+      .from('branch_stock')
+      .select('*')
+      .lt('quantity', 5)
+
     setStats({
       totalProducts: productsCount || 0,
-      totalOrders: ordersCount || 0,
-      totalSales,
-      lowStock: 0,
-      monthlySales,
+      totalOrders: totalOrders,
+      totalSales: totalSales,
+      lowStock: lowStockData?.length || 0,
+      monthlySales: monthlySales,
+      pendingOrders: pendingOrders,
     })
   }
 
   async function fetchRecentOrders() {
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5)
+    const { data } = await supabase
+      .from('orders')
+      .select('id, order_number, customer_name, total, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
     if (data) setRecentOrders(data)
   }
 
-  async function fetchFeaturedProducts() {
-    const { data } = await supabase.from('products').select('id, name, base_price, image_url').eq('is_active', true).limit(6)
-    if (data) setFeaturedProducts(data)
+  async function fetchTopProducts() {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('items')
+
+    const productSales: Record<string, { total: number; image_url: string }> = {}
+
+    orders?.forEach(order => {
+      const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+      items?.forEach((item: any) => {
+        if (!productSales[item.name]) {
+          productSales[item.name] = { total: 0, image_url: item.image_url || '' }
+        }
+        productSales[item.name].total += item.quantity || 0
+      })
+    })
+
+    const top = Object.entries(productSales)
+      .map(([name, data]) => ({ name, total: data.total, image_url: data.image_url }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+
+    setTopProducts(top)
   }
 
-  async function fetchLowStockProducts() {
-    const { data } = await supabase.from('branch_stock').select('product_id, quantity, products(name)').lt('quantity', 5).limit(5)
-    if (data) setLowStockProducts(data)
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-GT', {
+      style: 'currency',
+      currency: 'GTQ',
+      minimumFractionDigits: 2,
+    }).format(amount)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-700'
+      case 'pending': return 'bg-yellow-100 text-yellow-700'
+      case 'cancelled': return 'bg-red-100 text-red-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'paid': return 'Pagado'
+      case 'pending': return 'Pendiente'
+      case 'cancelled': return 'Cancelado'
+      default: return status
+    }
   }
 
   if (loading) {
@@ -81,95 +169,144 @@ export default function AdminDashboard() {
         <p className="text-[#6B6B6B] mt-1">Bienvenido al sistema de gestión de Florece</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-xl shadow-lg p-6 text-white">
+      {/* Tarjetas de estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] rounded-xl shadow-lg p-4 text-white">
           <div className="flex justify-between items-start">
-            <div><p className="text-white/80 text-sm">Total Productos</p><p className="text-3xl font-bold mt-1">{stats.totalProducts}</p></div>
-            <span className="text-3xl">🌵</span>
+            <div>
+              <p className="text-white/70 text-xs uppercase tracking-wide">Productos</p>
+              <p className="text-2xl font-bold mt-1">{stats.totalProducts}</p>
+            </div>
+            <span className="text-2xl">🌵</span>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-[#E76F51]">
-          <p className="text-[#6B6B6B] text-sm">Pedidos</p>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#E76F51]">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Pedidos Totales</p>
           <p className="text-2xl font-bold text-[#1B4332] mt-1">{stats.totalOrders}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-[#2D6A4F]">
-          <p className="text-[#6B6B6B] text-sm">Ventas Totales</p>
-          <p className="text-2xl font-bold text-[#1B4332] mt-1">Q{stats.totalSales.toFixed(2)}</p>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#2D6A4F]">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Ventas Totales</p>
+          <p className="text-xl font-bold text-[#1B4332] mt-1">{formatCurrency(stats.totalSales)}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-[#E9D8A6]">
-          <p className="text-[#6B6B6B] text-sm">Ventas del Mes</p>
-          <p className="text-2xl font-bold text-[#1B4332] mt-1">Q{stats.monthlySales.toFixed(2)}</p>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#E9D8A6]">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Ventas del Mes</p>
+          <p className="text-xl font-bold text-[#1B4332] mt-1">{formatCurrency(stats.monthlySales)}</p>
         </div>
-      </div>
-
-      {/* Featured Products */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-[#1B4332]">🌵 Productos Destacados</h2>
-          <Link href="/admin/productos" className="text-[#E76F51] text-sm hover:underline">Ver catálogo completo →</Link>
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#E76F51]">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Pedidos Pendientes</p>
+          <p className="text-2xl font-bold text-[#E76F51] mt-1">{stats.pendingOrders}</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {featuredProducts.map((product) => (
-            <div key={product.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition group">
-              <div className="h-32 bg-[#F5F5F0] flex items-center justify-center group-hover:bg-[#E9D8A6]/30 transition">
-                {product.image_url ? (
-                  <Image src={product.image_url} alt={product.name} width={80} height={80} className="object-cover" />
-                ) : (
-                  <span className="text-4xl">🌵</span>
-                )}
-              </div>
-              <div className="p-3 text-center">
-                <p className="font-medium text-sm text-[#2D2D2D] truncate">{product.name}</p>
-                <p className="text-[#1B4332] font-bold text-sm">Q{product.base_price?.toFixed(2)}</p>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#C53A1F]">
+          <p className="text-[#6B6B6B] text-xs uppercase tracking-wide">Stock Bajo</p>
+          <p className="text-2xl font-bold text-[#C53A1F] mt-1">{stats.lowStock}</p>
         </div>
       </div>
 
-      {/* Two column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Productos más vendidos */}
         <div className="bg-white rounded-xl shadow-md">
-          <div className="p-4 border-b border-[#E9D8A6]">
-            <h2 className="font-semibold text-[#1B4332]">📋 Pedidos Recientes</h2>
+          <div className="p-5 border-b border-[#E9D8A6]">
+            <h2 className="font-semibold text-[#1B4332] text-lg">🏆 Productos más vendidos</h2>
           </div>
           <div className="divide-y divide-[#E9D8A6]">
-            {recentOrders.length > 0 ? recentOrders.map((order) => (
-              <div key={order.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                <div>
-                  <p className="font-medium text-sm">{order.customer_name}</p>
-                  <p className="text-xs text-[#6B6B6B]">{new Date(order.created_at).toLocaleDateString()}</p>
+            {topProducts.length > 0 ? (
+              topProducts.map((product, idx) => (
+                <div key={idx} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-[#F5F5F0] rounded-full flex items-center justify-center text-sm font-bold text-[#1B4332]">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{product.name}</p>
+                      <p className="text-xs text-[#6B6B6B]">{product.total} unidades</p>
+                    </div>
+                  </div>
+                  <Link href="/admin/productos" className="text-[#E76F51] text-xs hover:underline">
+                    Ver producto →
+                  </Link>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-[#1B4332]">Q{order.total?.toFixed(2)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {order.status === 'paid' ? 'Pagado' : 'Pendiente'}
-                  </span>
-                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-[#6B6B6B]">
+                No hay ventas registradas aún
               </div>
-            )) : <div className="p-8 text-center text-[#6B6B6B]">No hay pedidos recientes</div>}
+            )}
           </div>
         </div>
 
-        {/* Low Stock Alerts */}
+        {/* Pedidos recientes */}
         <div className="bg-white rounded-xl shadow-md">
-          <div className="p-4 border-b border-[#E9D8A6]">
-            <h2 className="font-semibold text-[#E76F51]">⚠️ Alertas de Stock Bajo</h2>
+          <div className="p-5 border-b border-[#E9D8A6]">
+            <h2 className="font-semibold text-[#1B4332] text-lg">📋 Pedidos recientes</h2>
           </div>
           <div className="divide-y divide-[#E9D8A6]">
-            {lowStockProducts.length > 0 ? lowStockProducts.map((item, idx) => (
-              <div key={idx} className="p-4 flex justify-between items-center">
-                <div>
-                  <p className="font-medium text-sm">{item.products?.name || 'Producto'}</p>
-                  <p className="text-xs text-[#6B6B6B]">Stock actual: {item.quantity} unidades</p>
+            {recentOrders.length > 0 ? (
+              recentOrders.map((order) => (
+                <div key={order.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium text-sm">{order.customer_name}</p>
+                    <p className="text-xs text-[#6B6B6B]">{order.order_number}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-[#1B4332] text-sm">{formatCurrency(order.total)}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(order.status)}`}>
+                      {getStatusText(order.status)}
+                    </span>
+                  </div>
                 </div>
-                <Link href="/admin/inventario" className="text-[#1B4332] text-sm hover:underline">Reabastecer →</Link>
+              ))
+            ) : (
+              <div className="p-8 text-center text-[#6B6B6B]">
+                No hay pedidos registrados
               </div>
-            )) : <div className="p-8 text-center text-[#6B6B6B]">✓ Todos los productos tienen stock suficiente</div>}
+            )}
+          </div>
+          <div className="p-4 border-t border-[#E9D8A6] bg-gray-50">
+            <Link href="/admin/ventas" className="text-sm text-[#1B4332] hover:underline flex items-center justify-center gap-1">
+              Ver todos los pedidos →
+            </Link>
           </div>
         </div>
+      </div>
+
+      {/* Acciones rápidas */}
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Link href="/admin/productos" className="bg-white rounded-xl shadow-md p-4 flex items-center gap-3 hover:shadow-lg transition group">
+          <div className="w-10 h-10 bg-[#1B4332]/10 rounded-full flex items-center justify-center group-hover:bg-[#1B4332]/20 transition">
+            <span className="text-xl">🌵</span>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1B4332] text-sm">Gestionar Productos</p>
+            <p className="text-xs text-[#6B6B6B]">Agregar, editar o eliminar</p>
+          </div>
+        </Link>
+        <Link href="/admin/empleados" className="bg-white rounded-xl shadow-md p-4 flex items-center gap-3 hover:shadow-lg transition group">
+          <div className="w-10 h-10 bg-[#1B4332]/10 rounded-full flex items-center justify-center group-hover:bg-[#1B4332]/20 transition">
+            <span className="text-xl">👥</span>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1B4332] text-sm">Gestionar Empleados</p>
+            <p className="text-xs text-[#6B6B6B]">Altas, bajas y roles</p>
+          </div>
+        </Link>
+        <Link href="/admin/inventario" className="bg-white rounded-xl shadow-md p-4 flex items-center gap-3 hover:shadow-lg transition group">
+          <div className="w-10 h-10 bg-[#1B4332]/10 rounded-full flex items-center justify-center group-hover:bg-[#1B4332]/20 transition">
+            <span className="text-xl">📦</span>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1B4332] text-sm">Control de Inventario</p>
+            <p className="text-xs text-[#6B6B6B]">Revisar stock actual</p>
+          </div>
+        </Link>
+        <Link href="/admin/reportes" className="bg-white rounded-xl shadow-md p-4 flex items-center gap-3 hover:shadow-lg transition group">
+          <div className="w-10 h-10 bg-[#1B4332]/10 rounded-full flex items-center justify-center group-hover:bg-[#1B4332]/20 transition">
+            <span className="text-xl">📊</span>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1B4332] text-sm">Ver Reportes</p>
+            <p className="text-xs text-[#6B6B6B]">Financieros y ventas</p>
+          </div>
+        </Link>
       </div>
     </div>
   )
