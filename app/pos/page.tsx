@@ -27,6 +27,7 @@ export default function PosPage() {
   const [cashAmount, setCashAmount] = useState(0)
   const [change, setChange] = useState(0)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'transfer' | null>(null)
+  const [lastSaleData, setLastSaleData] = useState<{ total: number; cash: number; change: number; items: any[]; subtotal: number; iva: number } | null>(null)
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
@@ -162,6 +163,16 @@ export default function PosPage() {
       if (error) {
         toast.error('Error al registrar venta: ' + error.message)
       } else {
+        // Guardar datos de la venta para imprimir después
+        setLastSaleData({
+          total: total,
+          cash: amountPaid,
+          change: changeAmount,
+          items: items,
+          subtotal: subtotal,
+          iva: iva
+        })
+        
         if (method === 'cash' && changeAmount > 0) {
           toast.success(`Venta registrada - Total: Q${total.toFixed(2)} | Vuelto: Q${changeAmount.toFixed(2)}`)
         } else {
@@ -171,7 +182,7 @@ export default function PosPage() {
         setShowCashModal(false)
         setCashAmount(0)
         setChange(0)
-        setSelectedPaymentMethod(null)
+        // No resetear selectedPaymentMethod para mantener el último método
       }
     } catch (err) {
       console.error('Error:', err)
@@ -187,7 +198,12 @@ export default function PosPage() {
     processPayment('cash', cashAmount, change)
   }
 
-  const printTicket = () => {
+  const printLastTicket = () => {
+    if (!lastSaleData) {
+      toast.error('No hay venta reciente para imprimir')
+      return
+    }
+
     const ticketWindow = window.open('', '_blank')
     if (!ticketWindow) return
 
@@ -195,10 +211,9 @@ export default function PosPage() {
       return (precio * cantidad * 0.12)
     }
 
-    const itemsConIVA = items.map(item => ({
+    const itemsConIVA = lastSaleData.items.map(item => ({
       ...item,
       ivaItem: calcularIVA(item.price, item.quantity),
-      subtotalConIVA: (item.price * item.quantity) + calcularIVA(item.price, item.quantity)
     }))
 
     const ivaTotal = itemsConIVA.reduce((sum, item) => sum + item.ivaItem, 0)
@@ -233,12 +248,16 @@ export default function PosPage() {
           </div>
         `).join('')}
         <div>--------------------------------</div>
-        <div class="item"><span>Subtotal:</span><span>Q${subtotal.toFixed(2)}</span></div>
+        <div class="item"><span>Subtotal:</span><span>Q${lastSaleData.subtotal.toFixed(2)}</span></div>
         <div class="item"><span>IVA (12%):</span><span>Q${ivaTotal.toFixed(2)}</span></div>
-        <div class="total"><div class="item"><strong>TOTAL:</strong><strong>Q${total.toFixed(2)}</strong></div></div>
-        ${selectedPaymentMethod === 'cash' && cashAmount > 0 ? `
-          <div class="item"><span>Efectivo:</span><span>Q${cashAmount.toFixed(2)}</span></div>
-          <div class="item"><strong>VUELTO:</strong><strong>Q${change.toFixed(2)}</strong></div>
+        <div class="total"><div class="item"><strong>TOTAL:</strong><strong>Q${lastSaleData.total.toFixed(2)}</strong></div></div>
+        ${selectedPaymentMethod === 'cash' && lastSaleData.cash > 0 ? `
+          <div class="item"><span>Efectivo:</span><span>Q${lastSaleData.cash.toFixed(2)}</span></div>
+          <div class="item"><strong>VUELTO:</strong><strong>Q${lastSaleData.change.toFixed(2)}</strong></div>
+        ` : selectedPaymentMethod === 'card' ? `
+          <div class="item"><span>Tarjeta:</span><span>Q${lastSaleData.total.toFixed(2)}</span></div>
+        ` : selectedPaymentMethod === 'transfer' ? `
+          <div class="item"><span>Transferencia:</span><span>Q${lastSaleData.total.toFixed(2)}</span></div>
         ` : ''}
         <div>--------------------------------</div>
         <div class="footer">
@@ -339,12 +358,12 @@ export default function PosPage() {
             <p className="text-xs">{items.length} productos</p>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {items.length === 0 ? (
+            {items.length === 0 && !lastSaleData ? (
               <div className="text-center py-12">
                 <span className="text-5xl">🛒</span>
                 <p className="text-gray-400">Carrito vacío</p>
               </div>
-            ) : (
+            ) : items.length > 0 ? (
               <div className="space-y-3">
                 {items.map(item => (
                   <div key={item.id} className="flex justify-between items-center border-b pb-3">
@@ -361,22 +380,39 @@ export default function PosPage() {
                   </div>
                 ))}
               </div>
+            ) : lastSaleData && (
+              <div className="text-center py-12">
+                <span className="text-5xl mb-3 block">✅</span>
+                <p className="text-green-600 font-medium">¡Venta completada!</p>
+                <p className="text-sm text-gray-500 mt-1">Total: Q{lastSaleData.total.toFixed(2)}</p>
+              </div>
             )}
           </div>
           <div className="border-t p-4 space-y-3 bg-gray-50">
             <div className="flex justify-between"><span>Subtotal</span><span>Q{subtotalDisplay.toFixed(2)}</span></div>
             <div className="flex justify-between text-sm"><span>IVA (12%)</span><span>Q{ivaDisplay.toFixed(2)}</span></div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>TOTAL</span><span className="text-[#1B4332]">Q{totalDisplay.toFixed(2)}</span></div>
-            <div className="grid grid-cols-3 gap-2 pt-4">
-              <button onClick={() => openCashModal('cash')} disabled={items.length === 0} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💵 Efectivo</button>
-              <button onClick={() => openCashModal('card')} disabled={items.length === 0} className="bg-[#E76F51] text-white py-2 rounded-lg disabled:opacity-50">💳 Tarjeta</button>
-              <button onClick={() => openCashModal('transfer')} disabled={items.length === 0} className="bg-[#1B4332] text-white py-2 rounded-lg disabled:opacity-50">📱 Transferencia</button>
-            </div>
+            
             {items.length > 0 && (
-              <>
-                <button onClick={() => clearCart()} className="w-full text-red-500 text-sm">Vaciar carrito</button>
-                <button onClick={printTicket} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg text-sm">🖨️ Imprimir ticket</button>
-              </>
+              <div className="grid grid-cols-3 gap-2 pt-4">
+                <button onClick={() => openCashModal('cash')} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm">💵 Efectivo</button>
+                <button onClick={() => openCashModal('card')} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm">💳 Tarjeta</button>
+                <button onClick={() => openCashModal('transfer')} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm">📱 Transferencia</button>
+              </div>
+            )}
+            
+            {/* Botón imprimir SIEMPRE visible después de una venta */}
+            {lastSaleData && (
+              <button 
+                onClick={printLastTicket} 
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
+              >
+                🖨️ Imprimir última factura
+              </button>
+            )}
+            
+            {items.length > 0 && (
+              <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>
             )}
           </div>
         </div>
