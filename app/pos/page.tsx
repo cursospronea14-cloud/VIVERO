@@ -1,16 +1,4 @@
 'use client'
-// Después de fetchUser, agregar:
-if (profile?.role !== 'vendedor' && profile?.role !== 'admin') {
-  if (profile?.role === 'bodeguero') {
-    router.push('/bodega')
-  } else if (profile?.role === 'fumigador') {
-    router.push('/fumigacion')
-  } else {
-    router.push('/login')
-  }
-  return
-}
-
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -34,6 +22,10 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true)
   const [employeeName, setEmployeeName] = useState('')
   const [employeeRole, setEmployeeRole] = useState('')
+  const [showCashModal, setShowCashModal] = useState(false)
+  const [cashAmount, setCashAmount] = useState(0)
+  const [change, setChange] = useState(0)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'transfer' | null>(null)
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
@@ -47,28 +39,53 @@ export default function PosPage() {
     fetchProducts()
   }, [selectedCategory])
 
+  // Calcular vuelto cuando cambia el monto en efectivo
+  useEffect(() => {
+    const subtotal = getTotal()
+    const iva = subtotal * 0.12
+    const total = subtotal + iva
+    setChange(Math.max(0, cashAmount - total))
+  }, [cashAmount, getTotal])
+
   async function fetchUser() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', user.id)
-          .single()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error obteniendo perfil:', error)
+        setEmployeeName('Empleado')
+        setEmployeeRole('vendedor')
+      } else if (profile) {
+        setEmployeeName(profile.full_name || 'Empleado')
+        setEmployeeRole(profile.role || 'vendedor')
         
-        if (error) {
-          console.error('Error obteniendo perfil:', error)
-          setEmployeeName('Empleado')
-        } else if (profile) {
-          setEmployeeName(profile.full_name || 'Empleado')
-          setEmployeeRole(profile.role || 'vendedor')
+        // Redirigir según el rol si no es vendedor
+        if (profile.role === 'bodeguero') {
+          router.push('/bodega')
+          return
+        } else if (profile.role === 'fumigador') {
+          router.push('/fumigacion')
+          return
+        } else if (profile.role === 'admin' || profile.role === 'gerente') {
+          router.push('/admin')
+          return
         }
       }
     } catch (err) {
       console.error('Error en fetchUser:', err)
       setEmployeeName('Empleado')
+      setEmployeeRole('vendedor')
     }
   }
 
@@ -111,12 +128,23 @@ export default function PosPage() {
   const iva = subtotal * 0.12
   const total = subtotal + iva
 
-  const handlePayment = async (method: 'cash' | 'card' | 'transfer') => {
+  const openCashModal = (method: 'cash' | 'card' | 'transfer') => {
     if (items.length === 0) {
       toast.error('Agrega productos primero')
       return
     }
+    
+    if (method === 'cash') {
+      setSelectedPaymentMethod('cash')
+      setCashAmount(total)
+      setChange(0)
+      setShowCashModal(true)
+    } else {
+      processPayment(method, total, 0)
+    }
+  }
 
+  const processPayment = async (method: 'cash' | 'card' | 'transfer', amountPaid: number, changeAmount: number = 0) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -125,7 +153,6 @@ export default function PosPage() {
         return
       }
 
-      // Generar número de pedido único
       const orderNumber = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
       
       const { error } = await supabase
@@ -155,8 +182,16 @@ export default function PosPage() {
         console.error('Error al guardar venta:', error)
         toast.error('Error al registrar venta: ' + error.message)
       } else {
-        toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
+        if (method === 'cash' && changeAmount > 0) {
+          toast.success(`Venta registrada - Total: Q${total.toFixed(2)} | Vuelto: Q${changeAmount.toFixed(2)}`)
+        } else {
+          toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
+        }
         clearCart()
+        setShowCashModal(false)
+        setCashAmount(0)
+        setChange(0)
+        setSelectedPaymentMethod(null)
       }
     } catch (err) {
       console.error('Error:', err)
@@ -164,9 +199,74 @@ export default function PosPage() {
     }
   }
 
+  const handleCashPayment = () => {
+    if (cashAmount < total) {
+      toast.error(`El monto es insuficiente. Total: Q${total.toFixed(2)}`)
+      return
+    }
+    processPayment('cash', cashAmount, change)
+  }
+
+  const printTicket = () => {
+    const ticketWindow = window.open('', '_blank')
+    if (!ticketWindow) return
+    
+    ticketWindow.document.write(`
+      <html>
+      <head>
+        <title>Ticket de Venta - Florece</title>
+        <style>
+          body { font-family: monospace; font-size: 12px; padding: 20px; width: 300px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+          .title { font-size: 16px; font-weight: bold; }
+          .item { display: flex; justify-content: space-between; margin: 5px 0; }
+          .total { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; }
+          .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">🌵 FLORECE</div>
+          <div>Cactus y Suculentas</div>
+          <div>"Dios hace florecer el desierto"</div>
+          <div>Isaías 35:1</div>
+        </div>
+        <div>Fecha: ${new Date().toLocaleString()}</div>
+        <div>Atendió: ${employeeName}</div>
+        <div>--------------------------------</div>
+        ${items.map(item => `
+          <div class="item">
+            <span>${item.name} x${item.quantity}</span>
+            <span>Q${(item.price * item.quantity).toFixed(2)}</span>
+          </div>
+        `).join('')}
+        <div>--------------------------------</div>
+        <div class="item"><span>Subtotal:</span><span>Q${subtotal.toFixed(2)}</span></div>
+        <div class="item"><span>IVA (12%):</span><span>Q${iva.toFixed(2)}</span></div>
+        <div class="total"><div class="item"><strong>TOTAL:</strong><strong>Q${total.toFixed(2)}</strong></div></div>
+        ${selectedPaymentMethod === 'cash' && cashAmount > 0 ? `
+          <div class="item"><span>Efectivo:</span><span>Q${cashAmount.toFixed(2)}</span></div>
+          <div class="item"><span>Vuelto:</span><span>Q${change.toFixed(2)}</span></div>
+        ` : ''}
+        <div>--------------------------------</div>
+        <div class="footer">
+          <p>¡Gracias por su compra!</p>
+          <p>Visítenos en: vivero-florece.vercel.app</p>
+        </div>
+      </body>
+      </html>
+    `)
+    ticketWindow.document.close()
+    ticketWindow.print()
+  }
+
+  const subtotalDisplay = getTotal()
+  const ivaDisplay = subtotalDisplay * 0.12
+  const totalDisplay = subtotalDisplay + ivaDisplay
+
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header con botón de cerrar sesión */}
+      {/* Header */}
       <div className="bg-[#1B4332] text-white sticky top-0 z-10 shadow-lg">
         <div className="px-6 py-3 flex justify-between items-center">
           <div>
@@ -290,18 +390,77 @@ export default function PosPage() {
           </div>
 
           <div className="border-t p-4 space-y-3 bg-gray-50">
-            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>Q{subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-600">IVA (12%)</span><span>Q{iva.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>TOTAL</span><span className="text-[#1B4332]">Q{total.toFixed(2)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-600">Subtotal</span><span>Q{subtotalDisplay.toFixed(2)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-600">IVA (12%)</span><span>Q{ivaDisplay.toFixed(2)}</span></div>
+            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>TOTAL</span><span className="text-[#1B4332]">Q{totalDisplay.toFixed(2)}</span></div>
+            
             <div className="grid grid-cols-3 gap-2 pt-4">
-              <button onClick={() => handlePayment('cash')} disabled={items.length === 0} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💵 Efectivo</button>
-              <button onClick={() => handlePayment('card')} disabled={items.length === 0} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💳 Tarjeta</button>
-              <button onClick={() => handlePayment('transfer')} disabled={items.length === 0} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">📱 Transferencia</button>
+              <button onClick={() => openCashModal('cash')} disabled={items.length === 0} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💵 Efectivo</button>
+              <button onClick={() => openCashModal('card')} disabled={items.length === 0} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">💳 Tarjeta</button>
+              <button onClick={() => openCashModal('transfer')} disabled={items.length === 0} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50">📱 Transferencia</button>
             </div>
-            {items.length > 0 && <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>}
+            
+            {items.length > 0 && (
+              <>
+                <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>
+                <button onClick={printTicket} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">🖨️ Imprimir ticket</button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Modal para pago en efectivo */}
+      {showCashModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-[#E9D8A6] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#1B4332]">Pago en Efectivo</h2>
+              <button onClick={() => setShowCashModal(false)} className="text-2xl text-[#6B6B6B] hover:text-[#1B4332]">&times;</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-100 p-4 rounded-xl text-center">
+                <p className="text-sm text-gray-600">Total a pagar</p>
+                <p className="text-3xl font-bold text-[#1B4332]">Q{totalDisplay.toFixed(2)}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-[#2D2D2D] mb-1">Monto recibido</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full p-3 border border-gray-200 rounded-xl text-lg font-medium"
+                  autoFocus
+                />
+              </div>
+              
+              {cashAmount >= totalDisplay && (
+                <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Vuelto:</span>
+                    <span className="text-2xl font-bold text-green-600">Q{change.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+              
+              {cashAmount < totalDisplay && cashAmount > 0 && (
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+                  <p className="text-red-600 text-center">Faltan Q{(totalDisplay - cashAmount).toFixed(2)}</p>
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setShowCashModal(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50">Cancelar</button>
+                <button onClick={handleCashPayment} disabled={cashAmount < totalDisplay} className="flex-1 px-4 py-2 bg-[#1B4332] text-white rounded-xl hover:bg-[#2D6A4F] disabled:opacity-50">
+                  Cobrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
