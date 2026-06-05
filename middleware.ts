@@ -43,23 +43,38 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  // Si no hay sesión y la ruta es protegida
+  // Si no hay sesión, redirigir a login
   if (!session) {
     const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Verificar rol para admin
-  if (path.startsWith('/admin')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
+  // Obtener el rol del usuario
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
 
-    if (profile?.role !== 'admin' && profile?.role !== 'gerente') {
+  const userRole = profile?.role || 'vendedor'
+
+  // Reglas de redirección según rol
+  if (path === '/') {
+    if (userRole === 'admin') {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    } else {
       return NextResponse.redirect(new URL('/pos', req.url))
     }
+  }
+
+  // Si intenta acceder a /admin sin ser admin
+  if (path.startsWith('/admin') && userRole !== 'admin') {
+    return NextResponse.redirect(new URL('/pos', req.url))
+  }
+
+  // Si intenta acceder a /pos siendo admin, permitir (pero admin también puede ir a admin)
+  if (path.startsWith('/pos') && userRole === 'admin') {
+    return response
   }
 
   return response
