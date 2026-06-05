@@ -70,7 +70,7 @@ export default function HomePage() {
     <div className="container mx-auto px-4 py-8">
       <div className="text-center py-12 mb-8 bg-arena/30 rounded-2xl">
         <h1 className="text-4xl md:text-5xl font-serif text-agave mb-4">
-          Florece - Cactus y Suculentas
+          Desierto que Florece - Plantas Ornamentales, Cactus y Suculentas
         </h1>
         <p className="text-xl text-gris-suave italic">
           "Dios hace florecer el desierto. Isaías 35:1"
