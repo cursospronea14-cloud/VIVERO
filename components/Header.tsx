@@ -16,6 +16,7 @@ export default function Header() {
       <header className="bg-[#1B4332] text-white sticky top-0 z-50 shadow-lg">
         <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
+            {/* Logo */}
             <Link href="/" className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center overflow-hidden">
                 <Image
@@ -32,6 +33,7 @@ export default function Header() {
               </div>
             </Link>
 
+            {/* Navegación Desktop */}
             <nav className="hidden md:flex gap-6">
               <Link href="/" className="hover:text-[#E9D8A6] transition">Inicio</Link>
               <Link href="/#cactus" className="hover:text-[#E9D8A6] transition">Cactus</Link>
@@ -42,9 +44,9 @@ export default function Header() {
               </Link>
             </nav>
 
-            {/* Versión móvil - menú hamburguesa */}
+            {/* Botones móvil */}
             <div className="md:hidden flex items-center gap-3">
-              <Link href="/login" className="hover:text-[#E9D8A6] transition text-sm flex items-center gap-1">
+              <Link href="/login" className="hover:text-[#E9D8A6] transition text-sm">
                 🔐
               </Link>
               <button
@@ -62,7 +64,7 @@ export default function Header() {
               </button>
             </div>
 
-            {/* Versión desktop - carrito */}
+            {/* Carrito Desktop */}
             <div className="hidden md:flex items-center gap-4">
               <button
                 onClick={() => setIsCartOpen(true)}
