@@ -6,7 +6,7 @@ export default function Footer() {
           "Dios hace florecer el desierto. Isaías 35:1"
         </p>
         <p className="text-sm">
-          Florece - Cactus y Suculentas • Guatemala
+          Desierto que Florece - Plantas Ornamentales, Cactus y Suculentas • Guatemala, Parramos
         </p>
         <p className="text-xs mt-4">
           © {new Date().getFullYear()} Todos los derechos reservados
