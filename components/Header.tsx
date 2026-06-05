@@ -22,7 +22,7 @@ export default function Header() {
               </div>
               <div>
                 <h1 className="font-bold text-xl">DESIERTO QUE FLORECE</h1>
-                <p className="text-xs text-[#E9D8A6]">Cactus y Suculentas</p>
+                <p className="text-xs text-[#E9D8A6]">Plantas Ornamentales, Cactus y Suculentas</p>
               </div>
             </Link>
 
