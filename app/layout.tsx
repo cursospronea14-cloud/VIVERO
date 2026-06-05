@@ -4,7 +4,7 @@ import Header from '@/components/Header'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
-  title: 'Diserto que Florece - Cactus y Suculentas',
+  title: 'Desierto que Florece - Plantas Ornamentales, Cactus y Suculentas',
   description: 'Sistema de gestión de vivero',
   icons: {
     icon: '/logo.jpg',
