@@ -1,4 +1,16 @@
 'use client'
+// Después de fetchUser, agregar:
+if (profile?.role !== 'vendedor' && profile?.role !== 'admin') {
+  if (profile?.role === 'bodeguero') {
+    router.push('/bodega')
+  } else if (profile?.role === 'fumigador') {
+    router.push('/fumigacion')
+  } else {
+    router.push('/login')
+  }
+  return
+}
+
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
