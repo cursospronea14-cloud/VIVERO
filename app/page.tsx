@@ -7,7 +7,6 @@ export const revalidate = 0
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import ProductCard from '@/components/ProductCard'
-import toast from 'react-hot-toast'
 
 interface Product {
   id: number
@@ -32,6 +31,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState<string>('todas')
+  const [uniqueBranches, setUniqueBranches] = useState<string[]>([])
 
   useEffect(() => {
     fetchCategories()
@@ -113,6 +113,15 @@ export default function HomePage() {
         }
 
         setProducts(filteredProducts)
+
+        // Obtener sucursales únicas para el filtro (forma compatible)
+        const branchesMap: Record<string, boolean> = {}
+        processedProducts.forEach(p => {
+          if (p.branch_name) {
+            branchesMap[p.branch_name] = true
+          }
+        })
+        setUniqueBranches(Object.keys(branchesMap))
       }
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -120,9 +129,6 @@ export default function HomePage() {
       setLoading(false)
     }
   }
-
-  // Obtener sucursales únicas para el filtro
-  const uniqueBranches = [...new Set(products.map(p => p.branch_name).filter(Boolean))]
 
   return (
     <div className="container mx-auto px-4 py-8">
