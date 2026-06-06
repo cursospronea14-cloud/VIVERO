@@ -1,3 +1,11 @@
+// En app/page.tsx, después del header, agregar:
+{/* Solo visible para administradores (cuando están logueados) */}
+<div className="flex justify-end mb-4">
+  <Link href="/admin/inventario" className="text-sm text-[#1B4332] hover:underline flex items-center gap-1">
+    📦 Gestionar inventario
+  </Link>
+</div>
+
 'use client'
 
 export const dynamic = 'force-dynamic'
