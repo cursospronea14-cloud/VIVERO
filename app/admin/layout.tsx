@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="font-bold">DESIERTO QUE FLORECE</h1>
+              <h1 className="font-bold text-sm">DESIERTO QUE FLORECE</h1>
               <p className="text-xs text-white/60">Admin</p>
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               }`}
             >
               <span>{item.icon}</span>
-              <span>{item.name}</span>
+              <span className="text-sm">{item.name}</span>
             </Link>
           ))}
         </nav>
