@@ -19,7 +19,8 @@ export default function PosPage() {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [employeeName, setEmployeeName] = useState('')
+  const [employeeName, setEmployeeName] = useState('Cargando...')
+  const [employeeRole, setEmployeeRole] = useState('')
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
@@ -34,21 +35,31 @@ export default function PosPage() {
   }, [selectedCategory])
 
   async function fetchUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, role')
-      .eq('id', user.id)
-      .single()
-    if (profile) {
-      setEmployeeName(profile.full_name || 'Vendedor')
-      if (profile.role === 'admin') router.push('/admin')
-      if (profile.role === 'bodeguero') router.push('/bodega')
-      if (profile.role === 'fumigador') router.push('/fumigacion')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error obteniendo perfil:', error)
+        setEmployeeName('Empleado')
+        setEmployeeRole('vendedor')
+      } else if (profile) {
+        setEmployeeName(profile.full_name || 'Vendedor')
+        setEmployeeRole(profile.role || 'vendedor')
+        console.log('Usuario:', profile.full_name, 'Rol:', profile.role)
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      setEmployeeName('Empleado')
     }
   }
 
@@ -145,7 +156,8 @@ export default function PosPage() {
         <div className="px-6 py-3 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold">Punto de Venta</h1>
-            <p className="text-sm text-white/70">Atendiendo: {employeeName || 'Empleado'}</p>
+            <p className="text-sm text-white/70">Atendiendo: <span className="font-semibold">{employeeName}</span></p>
+            <p className="text-xs text-white/50 capitalize">Rol: {employeeRole || 'vendedor'}</p>
           </div>
           <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
             Cerrar sesión
