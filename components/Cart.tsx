@@ -43,7 +43,7 @@ export default function Cart({ isOpen, onClose }: CartProps) {
     }
 
     if (!customerData.email) {
-      toast.error('Ingresa tu correo electrónico para recibir la factura')
+      toast.error('Ingresa tu correo electrónico')
       return
     }
 
@@ -56,29 +56,7 @@ export default function Cart({ isOpen, onClose }: CartProps) {
 
     try {
       const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-      const { data: { user } } = await supabase.auth.getUser()
       
-      // Verificar stock
-      let stockDisponible = true
-      for (const item of items) {
-        const { data: stockData } = await supabase
-          .from('branch_stock')
-          .select('quantity')
-          .eq('product_id', item.id)
-          .single()
-        
-        if (!stockData || stockData.quantity < item.quantity) {
-          stockDisponible = false
-          toast.error(`Stock insuficiente para: ${item.name}`)
-          break
-        }
-      }
-
-      if (!stockDisponible) {
-        setLoading(false)
-        return
-      }
-
       // Guardar pedido
       const orderData = {
         order_number: orderNumber,
@@ -97,12 +75,10 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         })),
         subtotal: total,
         iva: ivaCalculado,
-        isr: 0,
         total: total,
         payment_method: 'pending',
         sale_type: 'online',
         status: 'pending',
-        seller_id: user?.id || null,
       }
 
       const { error } = await supabase.from('orders').insert([orderData])
@@ -114,85 +90,39 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         return
       }
 
-      // Construir factura con formato profesional
+      // Construir mensaje de WhatsApp
       const itemsList = items.map(item => {
         const itemTotal = item.price * item.quantity
-        const itemIVA = itemTotal * 0.12 / 1.12
-        return `
-┌─────────────────────────────────────
-│ ${item.name} x${item.quantity}
-│   Precio: Q${item.price.toFixed(2)}
-│   Subtotal: Q${itemTotal.toFixed(2)}
-│   IVA incluido: Q${itemIVA.toFixed(2)}
-└─────────────────────────────────────`
-      }).join('')
+        return `• ${item.name} x${item.quantity} = Q${itemTotal.toFixed(2)}`
+      }).join('\n')
 
       const nitInfo = customerData.nit && customerData.nit.trim() !== '' 
         ? `NIT: ${customerData.nit}`
         : 'NIT: Consumidor final'
 
-      const razonSocialInfo = customerData.business_name && customerData.business_name.trim() !== ''
-        ? `\nRazón Social: ${customerData.business_name}`
-        : ''
+      const mensaje = `🌵 *DESIERTO QUE FLORECE* 🌵
+      
+📋 *NUEVO PEDIDO* #${orderNumber}
 
-      const factura = `
-╔══════════════════════════════════════════════════════════════╗
-║                    🌵 DESIERTO QUE FLORECE 🌵                 ║
-║           Plantas Ornamentales, Cactus y Suculentas          ║
-║              "Dios hace florecer el desierto"                ║
-║                       Isaías 35:1                            ║
-╚══════════════════════════════════════════════════════════════╝
+👤 *DATOS DEL CLIENTE*
+Nombre: ${customerData.name}
+Teléfono: ${customerData.phone}
+Correo: ${customerData.email}
+${nitInfo}
+Dirección: ${customerData.billing_address}
 
-┌─────────────────────────────────────────────────────────────┐
-│                    FACTURA DE VENTA                          │
-│                      #${orderNumber}                          │
-│              Fecha: ${new Date().toLocaleString()}            │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                    DATOS DEL CLIENTE                         │
-├─────────────────────────────────────────────────────────────┤
-│  Nombre: ${customerData.name}
-│  Teléfono: ${customerData.phone}
-│  Correo: ${customerData.email}
-│  ${nitInfo}${razonSocialInfo}
-│  Dirección de envío: ${customerData.billing_address}
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                    DETALLE DE PRODUCTOS                      │
-├─────────────────────────────────────────────────────────────┤
+🛒 *PRODUCTOS*
 ${itemsList}
-└─────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────┐
-│                    RESUMEN DE PAGO                           │
-├─────────────────────────────────────────────────────────────┤
-│  Subtotal: Q${total.toFixed(2)}
-│  IVA (12% incluido): Q${ivaCalculado.toFixed(2)}
-│  ───────────────────────────────────────────────────────────
-│  TOTAL A PAGAR: Q${total.toFixed(2)}
-└─────────────────────────────────────────────────────────────┘
+💰 *TOTAL: Q${total.toFixed(2)}*
+(IVA 12% incluido)
 
-┌─────────────────────────────────────────────────────────────┐
-│                 INSTRUCCIONES DE PAGO                        │
-├─────────────────────────────────────────────────────────────┤
-│  💰 Total a pagar: Q${total.toFixed(2)}
-│  🏦 Transferencia bancaria a:
-│     Nombre: Desierto que Florece
-│     Banco: Industrial
-│     Cuenta: 123456789
-│  📧 Enviar comprobante a: ventas@desierto-florece.com
-│  ⏳ El pedido se procesará al confirmar el pago.
-└─────────────────────────────────────────────────────────────┘
+📌 *PENDIENTE DE PAGO*
+Realizar transferencia y enviar comprobante.
 
-╔══════════════════════════════════════════════════════════════╗
-║       ¡Gracias por su compra!                                ║
-║       🌵 Síguenos en redes sociales 🌵                       ║
-║       Dios hace florecer el desierto. Isaías 35:1            ║
-╚══════════════════════════════════════════════════════════════╝`
+🙏 *Dios hace florecer el desierto. Isaías 35:1*`
 
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(factura)}`
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(mensaje)}`
       window.open(whatsappUrl, '_blank')
       
       clearCart()
@@ -206,7 +136,7 @@ ${itemsList}
       })
       onClose()
       
-      toast.success(`Pedido #${orderNumber} registrado. En breve recibirás confirmación.`)
+      toast.success(`Pedido #${orderNumber} registrado. Revisa WhatsApp para enviar.`)
       
     } catch (err) {
       console.error('Error:', err)
@@ -258,8 +188,8 @@ ${itemsList}
 
               <div className="border-t pt-4">
                 <div className="mb-3">
-                  <p className="text-sm font-semibold text-[#1B4332]">📄 Datos para facturación y envío</p>
-                  <p className="text-xs text-gray-500">Completa tus datos para recibir la factura por correo</p>
+                  <p className="text-sm font-semibold text-[#1B4332]">📄 Datos para facturación</p>
+                  <p className="text-xs text-gray-500">Completa tus datos para la factura</p>
                 </div>
                 
                 <div className="space-y-3">
@@ -287,22 +217,20 @@ ${itemsList}
                     className="w-full p-2 border rounded-lg text-sm"
                     required
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="NIT (opcional)"
-                      value={customerData.nit}
-                      onChange={(e) => setCustomerData({ ...customerData, nit: e.target.value })}
-                      className="w-full p-2 border rounded-lg text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Razón social (opcional)"
-                      value={customerData.business_name}
-                      onChange={(e) => setCustomerData({ ...customerData, business_name: e.target.value })}
-                      className="w-full p-2 border rounded-lg text-sm"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="NIT (opcional)"
+                    value={customerData.nit}
+                    onChange={(e) => setCustomerData({ ...customerData, nit: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Razón social (opcional)"
+                    value={customerData.business_name}
+                    onChange={(e) => setCustomerData({ ...customerData, business_name: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
                   <textarea
                     placeholder="Dirección de envío *"
                     value={customerData.billing_address}
