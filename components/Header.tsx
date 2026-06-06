@@ -18,7 +18,7 @@ export default function Header() {
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                <Image src="/logo.jpg" alt="Florece Logo" width={48} height={48} className="object-cover" />
+                <Image src="/logo.jpg" alt="Logo" width={48} height={48} className="object-cover" />
               </div>
               <div>
                 <h1 className="font-bold text-xl">DESIERTO QUE FLORECE</h1>
