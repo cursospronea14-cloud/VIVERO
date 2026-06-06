@@ -13,7 +13,7 @@ interface CartProps {
 export default function Cart({ isOpen, onClose }: CartProps) {
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const [loading, setLoading] = useState(false)
-  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
+  const [showInvoiceForm, setShowInvoiceForm] = useState(true) // Mostrar siempre para facturación
   const [customerData, setCustomerData] = useState({
     name: '',
     phone: '',
@@ -23,10 +23,9 @@ export default function Cart({ isOpen, onClose }: CartProps) {
     billing_address: '',
   })
 
-  const subtotal = getTotal()
-  const iva = subtotal * 0.12
-  const isr = subtotal * 0.05
-  const total = subtotal + iva + isr
+  const total = getTotal() // El total ya incluye IVA
+  const ivaCalculado = total * 0.12 / 1.12 // IVA desglosado (lo que se paga al SAT)
+  const subtotalSinIVA = total - ivaCalculado
 
   const handleCheckout = async () => {
     if (items.length === 0) {
@@ -36,6 +35,11 @@ export default function Cart({ isOpen, onClose }: CartProps) {
 
     if (!customerData.name) {
       toast.error('Ingresa tu nombre para continuar')
+      return
+    }
+
+    if (!customerData.email) {
+      toast.error('Ingresa tu correo electrónico para recibir la factura')
       return
     }
 
@@ -49,7 +53,7 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         order_number: orderNumber,
         customer_name: customerData.name,
         customer_phone: customerData.phone || null,
-        customer_email: customerData.email || null,
+        customer_email: customerData.email,
         customer_nit: customerData.nit || null,
         customer_business_name: customerData.business_name || null,
         customer_billing_address: customerData.billing_address || null,
@@ -60,11 +64,11 @@ export default function Cart({ isOpen, onClose }: CartProps) {
           quantity: item.quantity,
           subtotal: item.price * item.quantity
         })),
-        subtotal: subtotal,
-        iva: iva,
-        isr: isr,
+        subtotal: total,
+        iva: ivaCalculado,
+        isr: 0,
         total: total,
-        payment_method: 'transfer',
+        payment_method: 'pending',
         sale_type: 'online',
         status: 'pending',
         seller_id: user?.id || null,
@@ -79,16 +83,31 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         return
       }
 
+      // Construir mensaje de WhatsApp con todos los datos
       const messageItems = items.map(item => 
         `- ${item.name} x${item.quantity} = Q${(item.price * item.quantity).toFixed(2)}`
       ).join('\n')
       
-      const totalText = `Subtotal: Q${subtotal.toFixed(2)}\nIVA 12%: Q${iva.toFixed(2)}\nISR 5%: Q${isr.toFixed(2)}\nTOTAL: Q${total.toFixed(2)}`
+      const totalText = `Subtotal: Q${total.toFixed(2)}\n(IVA 12% incluido)`
       
-      const customerInfo = `\n\n--- DATOS DEL CLIENTE ---\nNombre: ${customerData.name}\nTeléfono: ${customerData.phone || 'No especificado'}\nNIT: ${customerData.nit || 'Consumidor final'}`
+      const customerInfo = `
+\n\n--- DATOS DEL CLIENTE ---
+Nombre: ${customerData.name}
+Teléfono: ${customerData.phone || 'No especificado'}
+Correo: ${customerData.email}
+NIT: ${customerData.nit || 'Consumidor final'}
+Razón Social: ${customerData.business_name || 'No especifica'}
+Dirección: ${customerData.billing_address || 'No especifica'}`
+
+      const pendingPaymentNote = `
+\n\n--- INSTRUCCIONES DE PAGO ---
+💰 Total a pagar: Q${total.toFixed(2)}
+🏦 Transferencia bancaria a nombre: Desierto que Florece
+📧 Enviar comprobante a: ventas@desierto-florece.com
+⏳ El pedido se procesará al confirmar el pago.`
       
       const whatsappUrl = `https://wa.me/50212345678?text=${encodeURIComponent(
-        `🌵 *FLORECE - CACTUS Y SUCULENTAS* 🌵\n\n📋 *NUEVO PEDIDO* #${orderNumber}\n\n🛒 *Productos:*\n${messageItems}\n\n💰 *Totales:*\n${totalText}\n${customerInfo}\n\n*Dios hace florecer el desierto. Isaías 35:1*`
+        `🌵 *DESIERTO QUE FLORECE* 🌵\n\n📋 *NUEVO PEDIDO* #${orderNumber}\n\n🛒 *Productos:*\n${messageItems}\n\n💰 *Totales:*\n${totalText}\n${customerInfo}\n${pendingPaymentNote}\n\n*Dios hace florecer el desierto. Isaías 35:1*`
       )}`
       
       window.open(whatsappUrl, '_blank')
@@ -101,9 +120,10 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         business_name: '',
         billing_address: '',
       })
-      setShowInvoiceForm(false)
       onClose()
-      toast.success(`Pedido #${orderNumber} registrado`)
+      
+      // Mostrar mensaje de éxito con información de factura
+      toast.success(`Pedido #${orderNumber} registrado. Se enviará factura a ${customerData.email}`)
       
     } catch (err) {
       console.error('Error:', err)
@@ -153,14 +173,12 @@ export default function Cart({ isOpen, onClose }: CartProps) {
                 ))}
               </div>
 
-              {/* Formulario de facturación */}
+              {/* Formulario de facturación - Siempre visible */}
               <div className="border-t pt-4">
-                <button
-                  onClick={() => setShowInvoiceForm(!showInvoiceForm)}
-                  className="text-sm text-[#1B4332] hover:underline mb-3"
-                >
-                  {showInvoiceForm ? '📄 Ocultar facturación' : '📄 Agregar datos de facturación (NIT)'}
-                </button>
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-[#1B4332]">📄 Datos para facturación</p>
+                  <p className="text-xs text-gray-500">Completa tus datos para recibir la factura por correo</p>
+                </div>
                 
                 <div className="space-y-3">
                   <input
@@ -173,44 +191,42 @@ export default function Cart({ isOpen, onClose }: CartProps) {
                   />
                   <input
                     type="tel"
-                    placeholder="Teléfono"
+                    placeholder="Teléfono *"
                     value={customerData.phone}
                     onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
                     className="w-full p-2 border rounded-lg text-sm"
+                    required
                   />
-                  
-                  {showInvoiceForm && (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="NIT (para factura)"
-                        value={customerData.nit}
-                        onChange={(e) => setCustomerData({ ...customerData, nit: e.target.value })}
-                        className="w-full p-2 border rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Razón social"
-                        value={customerData.business_name}
-                        onChange={(e) => setCustomerData({ ...customerData, business_name: e.target.value })}
-                        className="w-full p-2 border rounded-lg text-sm"
-                      />
-                      <input
-                        type="email"
-                        placeholder="Correo para factura"
-                        value={customerData.email}
-                        onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
-                        className="w-full p-2 border rounded-lg text-sm"
-                      />
-                      <textarea
-                        placeholder="Dirección de facturación"
-                        value={customerData.billing_address}
-                        onChange={(e) => setCustomerData({ ...customerData, billing_address: e.target.value })}
-                        className="w-full p-2 border rounded-lg text-sm"
-                        rows={2}
-                      />
-                    </>
-                  )}
+                  <input
+                    type="email"
+                    placeholder="Correo electrónico * (para factura)"
+                    value={customerData.email}
+                    onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="NIT (opcional, para factura)"
+                    value={customerData.nit}
+                    onChange={(e) => setCustomerData({ ...customerData, nit: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Razón social (opcional)"
+                    value={customerData.business_name}
+                    onChange={(e) => setCustomerData({ ...customerData, business_name: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                  />
+                  <textarea
+                    placeholder="Dirección de envío *"
+                    value={customerData.billing_address}
+                    onChange={(e) => setCustomerData({ ...customerData, billing_address: e.target.value })}
+                    className="w-full p-2 border rounded-lg text-sm"
+                    rows={2}
+                    required
+                  />
                 </div>
               </div>
             </>
@@ -219,17 +235,24 @@ export default function Cart({ isOpen, onClose }: CartProps) {
 
         {items.length > 0 && (
           <div className="border-t p-4 space-y-2 bg-gray-50">
-            <div className="flex justify-between"><span>Subtotal</span><span>Q{subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between text-sm text-gray-500"><span>IVA (12%)</span><span>Q{iva.toFixed(2)}</span></div>
-            <div className="flex justify-between text-sm text-gray-500"><span>ISR (5%)</span><span>Q{isr.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>Total</span><span className="text-[#E76F51]">Q{total.toFixed(2)}</span></div>
+            <div className="flex justify-between">
+              <span>Total</span>
+              <span className="font-bold text-[#1B4332] text-xl">Q{total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>IVA 12% incluido</span>
+              <span>Q{ivaCalculado.toFixed(2)}</span>
+            </div>
             <button
               onClick={handleCheckout}
-              disabled={loading || !customerData.name}
-              className="w-full bg-[#E76F51] text-white py-3 rounded-lg font-semibold mt-4 disabled:opacity-50"
+              disabled={loading || !customerData.name || !customerData.email || !customerData.billing_address}
+              className="w-full bg-[#E76F51] text-white py-3 rounded-lg font-semibold mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Procesando...' : 'Confirmar pedido por WhatsApp'}
             </button>
+            <p className="text-xs text-center text-gray-400 mt-2">
+              🔒 Al confirmar, recibirás la factura en tu correo electrónico
+            </p>
           </div>
         )}
       </div>
