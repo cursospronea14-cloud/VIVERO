@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import Image from 'next/image'
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -14,6 +15,9 @@ const navItems = [
   { name: 'Ventas', href: '/admin/ventas', icon: '💰' },
   { name: 'Reportes', href: '/admin/reportes', icon: '📈' },
   { name: 'Configuración', href: '/admin/configuracion', icon: '⚙️' },
+  { name: 'Capital', href: '/admin/capital', icon: '💰' },
+  { name: 'Gastos', href: '/admin/gastos', icon: '📝' },
+  { name: 'Facturas', href: '/admin/facturas', icon: '📄' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -32,7 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return
     }
     
-    // Verificar rol
+    // Verificar que sea admin o gerente
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -57,7 +61,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl z-50">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl z-50 overflow-y-auto">
         <div className="p-4 border-b border-white/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-full overflow-hidden flex items-center justify-center">
@@ -77,12 +82,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               />
             </div>
             <div>
-              <h1 className="font-bold">FLORECE</h1>
-              <p className="text-xs text-white/60">Panel Admin</p>
+              <h1 className="font-bold">DESIERTO QUE FLORECE</h1>
+              <p className="text-xs text-white/60">Panel Administrador</p>
             </div>
           </div>
         </div>
-        <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-80px)]">
+        
+        <nav className="p-4 space-y-1">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -98,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           ))}
         </nav>
+        
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20 bg-[#1B4332]">
           <button
             onClick={() => supabase.auth.signOut()}
@@ -109,6 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
+      {/* Contenido principal */}
       <main className="ml-64 p-8 min-h-screen">
         {children}
       </main>
