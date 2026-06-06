@@ -80,6 +80,7 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         return
       }
 
+      // Guardar pedido en la base de datos como PENDIENTE
       const orderData = {
         order_number: orderNumber,
         customer_name: customerData.name,
@@ -108,7 +109,7 @@ export default function Cart({ isOpen, onClose }: CartProps) {
       const { error } = await supabase.from('orders').insert([orderData])
 
       if (error) {
-        console.error('Error:', error)
+        console.error('Error al guardar:', error)
         toast.error('Error al procesar el pedido')
         setLoading(false)
         return
@@ -142,9 +143,13 @@ Realizar transferencia y enviar comprobante.
 
 🙏 *Dios hace florecer el desierto. Isaías 35:1*`
 
+      // Abrir WhatsApp (esto funciona en desktop y móvil)
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(mensaje)}`
+      
+      // Abrir en una nueva pestaña
       window.open(whatsappUrl, '_blank')
       
+      // Limpiar carrito
       clearCart()
       setCustomerData({
         name: '',
@@ -156,7 +161,7 @@ Realizar transferencia y enviar comprobante.
       })
       onClose()
       
-      toast.success(`Pedido #${orderNumber} registrado. Se enviará factura a ${customerData.email}`)
+      toast.success(`Pedido #${orderNumber} registrado. En breve recibirás confirmación.`)
       
     } catch (err) {
       console.error('Error:', err)
