@@ -20,7 +20,9 @@ export default function RootLayout({
     <html lang="es">
       <body>
         <Header />
-        {children}
+        <main className="min-h-screen">
+          {children}
+        </main>
         <Toaster position="bottom-right" />
       </body>
     </html>
