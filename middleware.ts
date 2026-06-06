@@ -42,47 +42,40 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  // Si no hay sesión, redirigir a login
+  // Si no hay sesión, ir a login
   if (!session) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Obtener el rol del usuario
+  // Obtener rol del usuario
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
     .single()
 
-  const userRole = profile?.role || 'vendedor'
+  const role = profile?.role || 'vendedor'
 
-  // Si está en login, redirigir según su rol
+  // Redirigir según rol si está en login
   if (path === '/login') {
-    if (userRole === 'admin') {
-      return NextResponse.redirect(new URL('/admin', req.url))
-    } else if (userRole === 'bodeguero') {
-      return NextResponse.redirect(new URL('/bodega', req.url))
-    } else if (userRole === 'fumigador') {
-      return NextResponse.redirect(new URL('/fumigacion', req.url))
-    } else {
-      return NextResponse.redirect(new URL('/pos', req.url))
-    }
+    if (role === 'admin') return NextResponse.redirect(new URL('/admin', req.url))
+    if (role === 'bodeguero') return NextResponse.redirect(new URL('/bodega', req.url))
+    if (role === 'fumigador') return NextResponse.redirect(new URL('/fumigacion', req.url))
+    return NextResponse.redirect(new URL('/pos', req.url))
   }
 
-  // Verificar acceso según el rol
-  if (userRole === 'admin') {
-    return response
-  }
-
-  if (userRole === 'bodeguero' && !path.startsWith('/bodega')) {
+  // Verificar acceso a rutas protegidas
+  if (role === 'admin') return response
+  
+  if (role === 'bodeguero' && !path.startsWith('/bodega')) {
     return NextResponse.redirect(new URL('/bodega', req.url))
   }
-
-  if (userRole === 'fumigador' && !path.startsWith('/fumigacion')) {
+  
+  if (role === 'fumigador' && !path.startsWith('/fumigacion')) {
     return NextResponse.redirect(new URL('/fumigacion', req.url))
   }
-
-  if (userRole === 'vendedor' && !path.startsWith('/pos')) {
+  
+  if (role === 'vendedor' && !path.startsWith('/pos')) {
     return NextResponse.redirect(new URL('/pos', req.url))
   }
 
