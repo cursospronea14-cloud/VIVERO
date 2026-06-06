@@ -28,7 +28,7 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const path = req.nextUrl.pathname
 
-  // Rutas públicas
+  // Rutas públicas (accesibles sin login)
   const isPublicPath = 
     path === '/' ||
     path === '/login' ||
@@ -42,40 +42,48 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  // Si no hay sesión, ir a login
+  // Si no hay sesión, redirigir a login
   if (!session) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    const redirectUrl = new URL('/login', req.url)
+    return NextResponse.redirect(redirectUrl)
   }
 
-  // Obtener rol del usuario
+  // Obtener el rol del usuario
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
     .single()
 
-  const role = profile?.role || 'vendedor'
+  const userRole = profile?.role || 'vendedor'
 
-  // Redirigir según rol si está en login
+  // Si está en login, redirigir según su rol
   if (path === '/login') {
-    if (role === 'admin') return NextResponse.redirect(new URL('/admin', req.url))
-    if (role === 'bodeguero') return NextResponse.redirect(new URL('/bodega', req.url))
-    if (role === 'fumigador') return NextResponse.redirect(new URL('/fumigacion', req.url))
-    return NextResponse.redirect(new URL('/pos', req.url))
+    if (userRole === 'admin') {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    } else if (userRole === 'bodeguero') {
+      return NextResponse.redirect(new URL('/bodega', req.url))
+    } else if (userRole === 'fumigador') {
+      return NextResponse.redirect(new URL('/fumigacion', req.url))
+    } else {
+      return NextResponse.redirect(new URL('/pos', req.url))
+    }
   }
 
-  // Verificar acceso a rutas protegidas
-  if (role === 'admin') return response
-  
-  if (role === 'bodeguero' && !path.startsWith('/bodega')) {
+  // Verificar acceso según el rol
+  if (userRole === 'admin') {
+    return response
+  }
+
+  if (userRole === 'bodeguero' && !path.startsWith('/bodega')) {
     return NextResponse.redirect(new URL('/bodega', req.url))
   }
-  
-  if (role === 'fumigador' && !path.startsWith('/fumigacion')) {
+
+  if (userRole === 'fumigador' && !path.startsWith('/fumigacion')) {
     return NextResponse.redirect(new URL('/fumigacion', req.url))
   }
-  
-  if (role === 'vendedor' && !path.startsWith('/pos')) {
+
+  if (userRole === 'vendedor' && !path.startsWith('/pos')) {
     return NextResponse.redirect(new URL('/pos', req.url))
   }
 
