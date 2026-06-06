@@ -1,16 +1,4 @@
-// En app/page.tsx, después del header, agregar:
-{/* Solo visible para administradores (cuando están logueados) */}
-<div className="flex justify-end mb-4">
-  <Link href="/admin/inventario" className="text-sm text-[#1B4332] hover:underline flex items-center gap-1">
-    📦 Gestionar inventario
-  </Link>
-</div>
-
 'use client'
-
-export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-export const revalidate = 0
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -94,7 +82,6 @@ export default function HomePage() {
         console.error('Error:', error)
         setProducts([])
       } else if (data) {
-        // Procesar productos para mostrar stock por sucursal
         const processedProducts = data.map((product: any) => {
           let totalStock = 0
           let branchName = ''
@@ -114,7 +101,6 @@ export default function HomePage() {
           }
         })
 
-        // Filtrar por sucursal si se selecciona
         let filteredProducts = processedProducts
         if (selectedBranch !== 'todas') {
           filteredProducts = processedProducts.filter(p => p.branch_name === selectedBranch)
@@ -122,7 +108,6 @@ export default function HomePage() {
 
         setProducts(filteredProducts)
 
-        // Obtener sucursales únicas para el filtro (forma compatible)
         const branchesMap: Record<string, boolean> = {}
         processedProducts.forEach(p => {
           if (p.branch_name) {
@@ -181,7 +166,6 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Filtro por sucursal */}
         {uniqueBranches.length > 0 && (
           <select
             value={selectedBranch}
