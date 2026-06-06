@@ -24,7 +24,8 @@ export default function Cart({ isOpen, onClose }: CartProps) {
 
   const total = getTotal()
   const ivaCalculado = total * 0.12 / 1.12
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '50253203337'
+  // Número de WhatsApp del negocio (cámbialo por el tuyo)
+  const whatsappNumber = '50253203337'
 
   const handleCheckout = async () => {
     if (items.length === 0) {
@@ -58,6 +59,27 @@ export default function Cart({ isOpen, onClose }: CartProps) {
       const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`
       const { data: { user } } = await supabase.auth.getUser()
       
+      // Verificar stock antes de guardar
+      let stockDisponible = true
+      for (const item of items) {
+        const { data: stockData } = await supabase
+          .from('branch_stock')
+          .select('quantity')
+          .eq('product_id', item.id)
+          .single()
+        
+        if (!stockData || stockData.quantity < item.quantity) {
+          stockDisponible = false
+          toast.error(`Stock insuficiente para: ${item.name}`)
+          break
+        }
+      }
+
+      if (!stockDisponible) {
+        setLoading(false)
+        return
+      }
+
       const orderData = {
         order_number: orderNumber,
         customer_name: customerData.name,
@@ -92,92 +114,37 @@ export default function Cart({ isOpen, onClose }: CartProps) {
         return
       }
 
-      // Construir mensaje de WhatsApp en formato texto (como una factura en PDF)
+      // Construir mensaje de WhatsApp
       const itemsList = items.map(item => {
         const itemTotal = item.price * item.quantity
-        const itemIVA = itemTotal * 0.12 / 1.12
-        return `
-┌─────────────────────────────────────
-│ ${item.name} x${item.quantity}
-│   Precio unitario: Q${item.price.toFixed(2)}
-│   Subtotal: Q${itemTotal.toFixed(2)}
-│   IVA incluido: Q${itemIVA.toFixed(2)}
-└─────────────────────────────────────`
-      }).join('')
+        return `• ${item.name} x${item.quantity} = Q${itemTotal.toFixed(2)}`
+      }).join('\n')
 
-      const facturaTexto = `
-╔══════════════════════════════════════════════════════════╗
-║                    🌵 DESIERTO QUE FLORECE 🌵              ║
-║           Plantas Ornamentales, Cactus y Suculentas       ║
-║              "Dios hace florecer el desierto"             ║
-║                       Isaías 35:1                         ║
-╚══════════════════════════════════════════════════════════╝
-
-┌─────────────────────────────────────────────────────────┐
-│                    FACTURA DE VENTA                      │
-│                      #${orderNumber}                      │
-│              Fecha: ${new Date().toLocaleString()}        │
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                    DATOS DEL CLIENTE                     │
-├─────────────────────────────────────────────────────────┤
-│  Nombre: ${customerData.name}
-│  Teléfono: ${customerData.phone}
-│  Correo: ${customerData.email}
-│  NIT: ${customerData.nit || 'Consumidor final'}
-│  Razón Social: ${customerData.business_name || 'No especifica'}
-│  Dirección de envío: ${customerData.billing_address}
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                    DETALLE DE PRODUCTOS                  │
-├─────────────────────────────────────────────────────────┤
-${itemsList}
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                    RESUMEN DE PAGO                       │
-├─────────────────────────────────────────────────────────┤
-│  Subtotal: Q${total.toFixed(2)}
-│  IVA (12% incluido): Q${ivaCalculado.toFixed(2)}
-│  ───────────────────────────────────────────────────────
-│  TOTAL A PAGAR: Q${total.toFixed(2)}
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                 INSTRUCCIONES DE PAGO                    │
-├─────────────────────────────────────────────────────────┤
-│  💰 Total a pagar: Q${total.toFixed(2)}
-│  🏦 Transferencia bancaria a:
-│     Nombre: Desierto que Florece
-│     Banco: [Nombre del Banco]
-│     Cuenta: [Número de cuenta]
-│  📧 Enviar comprobante a: ventas@desierto-florece.com
-│  ⏳ El pedido se procesará al confirmar el pago.
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                    TÉRMINOS Y CONDICIONES                │
-├─────────────────────────────────────────────────────────┤
-│  • Los productos son entregados en un plazo de 3-5 días  │
-│  • La factura electrónica será enviada a su correo       │
-│  • Garantía de 30 días por defectos de fábrica           │
-└─────────────────────────────────────────────────────────┘
-
-╔══════════════════════════════════════════════════════════╗
-║       ¡Gracias por su compra!                            ║
-║       🌵 Síguenos en redes sociales 🌵                   ║
-║       Dios hace florecer el desierto. Isaías 35:1        ║
-╚══════════════════════════════════════════════════════════╝`
-
-      // El mensaje se envía DESDE el cliente al número del negocio
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(facturaTexto)}`
+      const mensaje = `🌵 *DESIERTO QUE FLORECE* 🌵
       
-      // Abrir WhatsApp
+📋 *NUEVO PEDIDO* #${orderNumber}
+
+👤 *DATOS DEL CLIENTE*
+Nombre: ${customerData.name}
+Teléfono: ${customerData.phone}
+Correo: ${customerData.email}
+NIT: ${customerData.nit || 'Consumidor final'}
+Dirección: ${customerData.billing_address}
+
+🛒 *PRODUCTOS*
+${itemsList}
+
+💰 *TOTAL: Q${total.toFixed(2)}*
+(IVA 12% incluido)
+
+📌 *PENDIENTE DE PAGO*
+Realizar transferencia y enviar comprobante.
+
+🙏 *Dios hace florecer el desierto. Isaías 35:1*`
+
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(mensaje)}`
       window.open(whatsappUrl, '_blank')
       
-      // Limpiar carrito y resetear formulario
       clearCart()
       setCustomerData({
         name: '',
@@ -189,7 +156,7 @@ ${itemsList}
       })
       onClose()
       
-      toast.success(`Pedido #${orderNumber} registrado. Se enviará factura electrónica a ${customerData.email}`)
+      toast.success(`Pedido #${orderNumber} registrado. Se enviará factura a ${customerData.email}`)
       
     } catch (err) {
       console.error('Error:', err)
@@ -219,7 +186,6 @@ ${itemsList}
             </div>
           ) : (
             <>
-              {/* Lista de productos */}
               <div className="space-y-4 mb-4">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-4 border-b pb-4">
@@ -240,7 +206,6 @@ ${itemsList}
                 ))}
               </div>
 
-              {/* Formulario de datos del cliente */}
               <div className="border-t pt-4">
                 <div className="mb-3">
                   <p className="text-sm font-semibold text-[#1B4332]">📄 Datos para facturación y envío</p>
@@ -258,7 +223,7 @@ ${itemsList}
                   />
                   <input
                     type="tel"
-                    placeholder="Teléfono * (para contacto)"
+                    placeholder="Teléfono *"
                     value={customerData.phone}
                     onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
                     className="w-full p-2 border rounded-lg text-sm"
@@ -266,7 +231,7 @@ ${itemsList}
                   />
                   <input
                     type="email"
-                    placeholder="Correo electrónico * (para factura)"
+                    placeholder="Correo electrónico *"
                     value={customerData.email}
                     onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
                     className="w-full p-2 border rounded-lg text-sm"
@@ -274,7 +239,7 @@ ${itemsList}
                   />
                   <input
                     type="text"
-                    placeholder="NIT (opcional, para factura)"
+                    placeholder="NIT (opcional)"
                     value={customerData.nit}
                     onChange={(e) => setCustomerData({ ...customerData, nit: e.target.value })}
                     className="w-full p-2 border rounded-lg text-sm"
@@ -317,9 +282,6 @@ ${itemsList}
             >
               {loading ? 'Procesando...' : 'Confirmar pedido por WhatsApp'}
             </button>
-            <p className="text-xs text-center text-gray-400 mt-2">
-              🔒 Al confirmar, se abrirá WhatsApp para enviar tu pedido al negocio
-            </p>
           </div>
         )}
       </div>
