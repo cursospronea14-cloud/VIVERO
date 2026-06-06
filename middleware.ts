@@ -26,7 +26,6 @@ export async function middleware(req: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
-
   const path = req.nextUrl.pathname
 
   // Rutas públicas
@@ -45,8 +44,7 @@ export async function middleware(req: NextRequest) {
 
   // Si no hay sesión, redirigir a login
   if (!session) {
-    const redirectUrl = new URL('/login', req.url)
-    return NextResponse.redirect(redirectUrl)
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
   // Obtener el rol del usuario
@@ -58,22 +56,54 @@ export async function middleware(req: NextRequest) {
 
   const userRole = profile?.role || 'vendedor'
 
-  // Reglas de redirección según rol
-  if (path === '/') {
-    if (userRole === 'admin') {
-      return NextResponse.redirect(new URL('/admin', req.url))
-    } else {
-      return NextResponse.redirect(new URL('/pos', req.url))
-    }
+  // Reglas de redirección según el rol
+  // ADMINISTRADOR - todo acceso
+  if (userRole === 'admin') {
+    if (path === '/pos') return response
+    if (path === '/admin') return response
+    if (path === '/bodega') return NextResponse.redirect(new URL('/admin', req.url))
+    if (path === '/fumigacion') return NextResponse.redirect(new URL('/admin', req.url))
+    if (path === '/') return NextResponse.redirect(new URL('/admin', req.url))
+    return response
   }
 
-  // Si intenta acceder a /admin sin ser admin
-  if (path.startsWith('/admin') && userRole !== 'admin') {
-    return NextResponse.redirect(new URL('/pos', req.url))
+  // GERENTE - similar a admin pero con menos permisos
+  if (userRole === 'gerente') {
+    if (path === '/admin') return response
+    if (path === '/pos') return NextResponse.redirect(new URL('/admin', req.url))
+    if (path === '/bodega') return NextResponse.redirect(new URL('/admin', req.url))
+    if (path === '/fumigacion') return NextResponse.redirect(new URL('/admin', req.url))
+    if (path === '/') return NextResponse.redirect(new URL('/admin', req.url))
+    return response
   }
 
-  // Si intenta acceder a /pos siendo admin, permitir (pero admin también puede ir a admin)
-  if (path.startsWith('/pos') && userRole === 'admin') {
+  // VENDEDOR - solo POS
+  if (userRole === 'vendedor') {
+    if (path === '/pos') return response
+    if (path === '/admin') return NextResponse.redirect(new URL('/pos', req.url))
+    if (path === '/bodega') return NextResponse.redirect(new URL('/pos', req.url))
+    if (path === '/fumigacion') return NextResponse.redirect(new URL('/pos', req.url))
+    if (path === '/') return NextResponse.redirect(new URL('/pos', req.url))
+    return response
+  }
+
+  // BODEGUERO - solo bodega
+  if (userRole === 'bodeguero') {
+    if (path === '/bodega') return response
+    if (path === '/admin') return NextResponse.redirect(new URL('/bodega', req.url))
+    if (path === '/pos') return NextResponse.redirect(new URL('/bodega', req.url))
+    if (path === '/fumigacion') return NextResponse.redirect(new URL('/bodega', req.url))
+    if (path === '/') return NextResponse.redirect(new URL('/bodega', req.url))
+    return response
+  }
+
+  // FUMIGADOR - solo fumigacion
+  if (userRole === 'fumigador') {
+    if (path === '/fumigacion') return response
+    if (path === '/admin') return NextResponse.redirect(new URL('/fumigacion', req.url))
+    if (path === '/pos') return NextResponse.redirect(new URL('/fumigacion', req.url))
+    if (path === '/bodega') return NextResponse.redirect(new URL('/fumigacion', req.url))
+    if (path === '/') return NextResponse.redirect(new URL('/fumigacion', req.url))
     return response
   }
 
