@@ -61,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div>
               <h1 className="font-bold text-sm">DESIERTO QUE FLORECE</h1>
-              <p className="text-xs text-white/60">Admin</p>
+              <p className="text-xs text-white/60">Administrador</p>
             </div>
           </div>
         </div>
