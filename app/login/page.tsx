@@ -56,7 +56,7 @@ export default function LoginPage() {
         .single()
       
       const role = profile?.role || 'vendedor'
-      toast.success('Bienvenido al sistema')
+      toast.success(`Bienvenido ${role === 'admin' ? 'Administrador' : 'Empleado'}`)
       
       if (role === 'admin') router.replace('/admin')
       else if (role === 'bodeguero') router.replace('/bodega')
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4332]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 placeholder="••••••••"
               />
               <button
