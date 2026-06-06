@@ -27,7 +27,15 @@ export default function PosPage() {
   const [cashAmount, setCashAmount] = useState(0)
   const [change, setChange] = useState(0)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'transfer' | null>(null)
-  const [lastSaleData, setLastSaleData] = useState<{ total: number; cash: number; change: number; items: any[]; subtotal: number; iva: number } | null>(null)
+  const [lastSaleData, setLastSaleData] = useState<{ 
+    total: number; 
+    cash: number; 
+    change: number; 
+    items: any[]; 
+    subtotal: number; 
+    iva: number;
+    orderNumber: string;
+  } | null>(null)
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
@@ -43,9 +51,7 @@ export default function PosPage() {
 
   useEffect(() => {
     const subtotal = getTotal()
-    const iva = subtotal * 0.12
-    const total = subtotal + iva
-    setChange(Math.max(0, cashAmount - total))
+    setChange(Math.max(0, cashAmount - subtotal))
   }, [cashAmount, getTotal])
 
   async function fetchUser() {
@@ -113,9 +119,9 @@ export default function PosPage() {
     p.barcode?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const subtotal = getTotal()
-  const iva = subtotal * 0.12
-  const total = subtotal + iva
+  const total = getTotal() // El total ya incluye IVA
+  const ivaCalculado = total * 0.12 / 1.12
+  const subtotalSinIVA = total - ivaCalculado
 
   const openCashModal = (method: 'cash' | 'card' | 'transfer') => {
     if (items.length === 0) {
@@ -151,8 +157,8 @@ export default function PosPage() {
           price: item.price,
           quantity: item.quantity
         })),
-        subtotal: subtotal,
-        iva: iva,
+        subtotal: total,
+        iva: ivaCalculado,
         isr: 0,
         total: total,
         payment_method: method,
@@ -169,8 +175,9 @@ export default function PosPage() {
           cash: amountPaid,
           change: changeAmount,
           items: items,
-          subtotal: subtotal,
-          iva: iva
+          subtotal: total,
+          iva: ivaCalculado,
+          orderNumber: orderNumber
         })
         
         if (method === 'cash' && changeAmount > 0) {
@@ -182,7 +189,6 @@ export default function PosPage() {
         setShowCashModal(false)
         setCashAmount(0)
         setChange(0)
-        // No resetear selectedPaymentMethod para mantener el último método
       }
     } catch (err) {
       console.error('Error:', err)
@@ -207,17 +213,6 @@ export default function PosPage() {
     const ticketWindow = window.open('', '_blank')
     if (!ticketWindow) return
 
-    const calcularIVA = (precio: number, cantidad: number) => {
-      return (precio * cantidad * 0.12)
-    }
-
-    const itemsConIVA = lastSaleData.items.map(item => ({
-      ...item,
-      ivaItem: calcularIVA(item.price, item.quantity),
-    }))
-
-    const ivaTotal = itemsConIVA.reduce((sum, item) => sum + item.ivaItem, 0)
-
     ticketWindow.document.write(`
       <html>
       <head>
@@ -238,20 +233,21 @@ export default function PosPage() {
           <div>"Dios hace florecer el desierto"</div>
           <div>Isaías 35:1</div>
         </div>
+        <div>Factura: ${lastSaleData.orderNumber}</div>
         <div>Fecha: ${new Date().toLocaleString()}</div>
         <div>Atendió: ${employeeName || 'Empleado'}</div>
         <div>--------------------------------</div>
-        ${itemsConIVA.map(item => `
+        ${lastSaleData.items.map((item: any) => `
           <div class="item">
             <span>${item.name} x${item.quantity}</span>
             <span>Q${(item.price * item.quantity).toFixed(2)}</span>
           </div>
         `).join('')}
         <div>--------------------------------</div>
-        <div class="item"><span>Subtotal:</span><span>Q${lastSaleData.subtotal.toFixed(2)}</span></div>
-        <div class="item"><span>IVA (12%):</span><span>Q${ivaTotal.toFixed(2)}</span></div>
+        <div class="item"><span>Subtotal sin IVA:</span><span>Q${(lastSaleData.total - lastSaleData.iva).toFixed(2)}</span></div>
+        <div class="item"><span>IVA (12%):</span><span>Q${lastSaleData.iva.toFixed(2)}</span></div>
         <div class="total"><div class="item"><strong>TOTAL:</strong><strong>Q${lastSaleData.total.toFixed(2)}</strong></div></div>
-        ${selectedPaymentMethod === 'cash' && lastSaleData.cash > 0 ? `
+        ${lastSaleData.cash > 0 ? `
           <div class="item"><span>Efectivo:</span><span>Q${lastSaleData.cash.toFixed(2)}</span></div>
           <div class="item"><strong>VUELTO:</strong><strong>Q${lastSaleData.change.toFixed(2)}</strong></div>
         ` : selectedPaymentMethod === 'card' ? `
@@ -283,10 +279,6 @@ export default function PosPage() {
       </div>
     )
   }
-
-  const subtotalDisplay = getTotal()
-  const ivaDisplay = subtotalDisplay * 0.12
-  const totalDisplay = subtotalDisplay + ivaDisplay
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -385,34 +377,32 @@ export default function PosPage() {
                 <span className="text-5xl mb-3 block">✅</span>
                 <p className="text-green-600 font-medium">¡Venta completada!</p>
                 <p className="text-sm text-gray-500 mt-1">Total: Q{lastSaleData.total.toFixed(2)}</p>
+                <p className="text-xs text-gray-400 mt-1">Factura: {lastSaleData.orderNumber}</p>
               </div>
             )}
           </div>
           <div className="border-t p-4 space-y-3 bg-gray-50">
-            <div className="flex justify-between"><span>Subtotal</span><span>Q{subtotalDisplay.toFixed(2)}</span></div>
-            <div className="flex justify-between text-sm"><span>IVA (12%)</span><span>Q{ivaDisplay.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>TOTAL</span><span className="text-[#1B4332]">Q{totalDisplay.toFixed(2)}</span></div>
-            
             {items.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 pt-4">
-                <button onClick={() => openCashModal('cash')} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm">💵 Efectivo</button>
-                <button onClick={() => openCashModal('card')} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm">💳 Tarjeta</button>
-                <button onClick={() => openCashModal('transfer')} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm">📱 Transferencia</button>
-              </div>
+              <>
+                <div className="flex justify-between"><span>Total</span><span className="font-bold text-[#1B4332]">Q{total.toFixed(2)}</span></div>
+                <div className="flex justify-between text-xs text-gray-500"><span>IVA (12% incluido)</span><span>Q{ivaCalculado.toFixed(2)}</span></div>
+                <div className="grid grid-cols-3 gap-2 pt-4">
+                  <button onClick={() => openCashModal('cash')} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm">💵 Efectivo</button>
+                  <button onClick={() => openCashModal('card')} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm">💳 Tarjeta</button>
+                  <button onClick={() => openCashModal('transfer')} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm">📱 Transferencia</button>
+                </div>
+                <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>
+              </>
             )}
             
             {/* Botón imprimir SIEMPRE visible después de una venta */}
             {lastSaleData && (
               <button 
                 onClick={printLastTicket} 
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold text-sm hover:bg-blue-700 transition mt-2"
               >
                 🖨️ Imprimir última factura
               </button>
-            )}
-            
-            {items.length > 0 && (
-              <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>
             )}
           </div>
         </div>
@@ -428,7 +418,7 @@ export default function PosPage() {
             <div className="p-5 space-y-4">
               <div className="bg-gray-100 p-4 rounded-xl text-center">
                 <p className="text-sm text-gray-600">Total a pagar</p>
-                <p className="text-3xl font-bold text-[#1B4332]">Q{totalDisplay.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-[#1B4332]">Q{total.toFixed(2)}</p>
               </div>
               <div>
                 <label className="block text-sm mb-1">Monto recibido</label>
@@ -441,7 +431,7 @@ export default function PosPage() {
                   autoFocus
                 />
               </div>
-              {cashAmount >= totalDisplay && (
+              {cashAmount >= total && (
                 <div className="bg-green-50 p-4 rounded-xl">
                   <div className="flex justify-between">
                     <span>Vuelto:</span>
@@ -449,14 +439,14 @@ export default function PosPage() {
                   </div>
                 </div>
               )}
-              {cashAmount < totalDisplay && cashAmount > 0 && (
+              {cashAmount < total && cashAmount > 0 && (
                 <div className="bg-red-50 p-4 rounded-xl">
-                  <p className="text-red-600">Faltan Q{(totalDisplay - cashAmount).toFixed(2)}</p>
+                  <p className="text-red-600">Faltan Q{(total - cashAmount).toFixed(2)}</p>
                 </div>
               )}
               <div className="flex gap-3 pt-4">
                 <button onClick={() => setShowCashModal(false)} className="flex-1 px-4 py-2 border rounded-xl">Cancelar</button>
-                <button onClick={handleCashPayment} disabled={cashAmount < totalDisplay} className="flex-1 px-4 py-2 bg-[#1B4332] text-white rounded-xl">Cobrar</button>
+                <button onClick={handleCashPayment} disabled={cashAmount < total} className="flex-1 px-4 py-2 bg-[#1B4332] text-white rounded-xl">Cobrar</button>
               </div>
             </div>
           </div>
