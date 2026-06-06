@@ -11,260 +11,71 @@ interface Product {
   name: string
   base_price: number
   image_url: string
-  sku: string
-  barcode: string
 }
 
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<any[]>([])
-  const [search, setSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [employeeName, setEmployeeName] = useState('')
-  const [employeeRole, setEmployeeRole] = useState('')
-  const [showCashModal, setShowCashModal] = useState(false)
-  const [cashAmount, setCashAmount] = useState(0)
-  const [change, setChange] = useState(0)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'card' | 'transfer' | null>(null)
-  const [lastSaleData, setLastSaleData] = useState<{ 
-    total: number; 
-    cash: number; 
-    change: number; 
-    items: any[]; 
-    subtotal: number; 
-    iva: number;
-    orderNumber: string;
-  } | null>(null)
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
   useEffect(() => {
     fetchUser()
-    fetchCategories()
     fetchProducts()
   }, [])
 
-  useEffect(() => {
-    fetchProducts()
-  }, [selectedCategory])
-
-  useEffect(() => {
-    const subtotal = getTotal()
-    setChange(Math.max(0, cashAmount - subtotal))
-  }, [cashAmount, getTotal])
-
   async function fetchUser() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-      if (profile) {
-        setEmployeeName(profile.full_name || 'Empleado')
-        setEmployeeRole(profile.role || 'vendedor')
-        if (profile.role === 'bodeguero') {
-          router.push('/bodega')
-          return
-        }
-        if (profile.role === 'fumigador') {
-          router.push('/fumigacion')
-          return
-        }
-        if (profile.role === 'admin') {
-          router.push('/admin')
-          return
-        }
-      }
-    } catch (err) {
-      console.error('Error:', err)
-      setEmployeeName('Empleado')
-      setEmployeeRole('vendedor')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
     }
-  }
-
-  async function fetchCategories() {
-    const { data } = await supabase
-      .from('categories')
-      .select('id, name')
-      .order('display_order')
-    if (data) setCategories(data)
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+    if (profile) setEmployeeName(profile.full_name || 'Vendedor')
   }
 
   async function fetchProducts() {
-    setLoading(true)
-    let query = supabase
+    const { data } = await supabase
       .from('products')
-      .select('id, name, base_price, image_url, sku, barcode')
+      .select('id, name, base_price, image_url')
       .eq('is_active', true)
-
-    if (selectedCategory) {
-      query = query.eq('category_id', selectedCategory)
-    }
-
-    const { data } = await query
+      .limit(20)
     if (data) setProducts(data)
     setLoading(false)
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(search.toLowerCase()) ||
-    p.barcode?.toLowerCase().includes(search.toLowerCase())
-  )
+  const total = getTotal()
+  const iva = total * 0.12 / 1.12
 
-  const total = getTotal() // El total ya incluye IVA
-  const ivaCalculado = total * 0.12 / 1.12
-  const subtotalSinIVA = total - ivaCalculado
-
-  const openCashModal = (method: 'cash' | 'card' | 'transfer') => {
+  const handlePayment = async (method: 'cash' | 'card' | 'transfer') => {
     if (items.length === 0) {
       toast.error('Agrega productos primero')
       return
     }
-    if (method === 'cash') {
-      setSelectedPaymentMethod('cash')
-      setCashAmount(total)
-      setChange(0)
-      setShowCashModal(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const orderNumber = `POS-${Date.now()}`
+
+    const { error } = await supabase.from('orders').insert({
+      order_number: orderNumber,
+      seller_id: user?.id,
+      customer_name: 'Cliente de mostrador',
+      items: items,
+      subtotal: total,
+      iva: iva,
+      total: total,
+      payment_method: method,
+      sale_type: 'pos',
+      status: 'paid',
+    })
+
+    if (error) {
+      toast.error('Error al registrar venta')
     } else {
-      processPayment(method, total, 0)
+      toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
+      clearCart()
     }
-  }
-
-  const processPayment = async (method: 'cash' | 'card' | 'transfer', amountPaid: number, changeAmount: number = 0) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Usuario no autenticado')
-        return
-      }
-      const orderNumber = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-      const { error } = await supabase.from('orders').insert({
-        order_number: orderNumber,
-        branch_id: 1,
-        seller_id: user.id,
-        customer_name: 'Cliente de mostrador',
-        items: items.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        })),
-        subtotal: total,
-        iva: ivaCalculado,
-        isr: 0,
-        total: total,
-        payment_method: method,
-        sale_type: 'pos',
-        status: 'paid',
-        paid_at: new Date().toISOString(),
-      })
-      if (error) {
-        toast.error('Error al registrar venta: ' + error.message)
-      } else {
-        // Guardar datos de la venta para imprimir después
-        setLastSaleData({
-          total: total,
-          cash: amountPaid,
-          change: changeAmount,
-          items: items,
-          subtotal: total,
-          iva: ivaCalculado,
-          orderNumber: orderNumber
-        })
-        
-        if (method === 'cash' && changeAmount > 0) {
-          toast.success(`Venta registrada - Total: Q${total.toFixed(2)} | Vuelto: Q${changeAmount.toFixed(2)}`)
-        } else {
-          toast.success(`Venta registrada - Total: Q${total.toFixed(2)}`)
-        }
-        clearCart()
-        setShowCashModal(false)
-        setCashAmount(0)
-        setChange(0)
-      }
-    } catch (err) {
-      console.error('Error:', err)
-      toast.error('Error inesperado al registrar venta')
-    }
-  }
-
-  const handleCashPayment = () => {
-    if (cashAmount < total) {
-      toast.error(`Monto insuficiente. Total: Q${total.toFixed(2)}`)
-      return
-    }
-    processPayment('cash', cashAmount, change)
-  }
-
-  const printLastTicket = () => {
-    if (!lastSaleData) {
-      toast.error('No hay venta reciente para imprimir')
-      return
-    }
-
-    const ticketWindow = window.open('', '_blank')
-    if (!ticketWindow) return
-
-    ticketWindow.document.write(`
-      <html>
-      <head>
-        <title>Ticket de Venta</title>
-        <style>
-          body { font-family: monospace; font-size: 12px; padding: 20px; width: 300px; margin: 0 auto; }
-          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .title { font-size: 16px; font-weight: bold; }
-          .item { display: flex; justify-content: space-between; margin: 5px 0; }
-          .total { border-top: 1px dashed #000; margin-top: 10px; padding-top: 10px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">🌵 DESIERTO QUE FLORECE</div>
-          <div>Plantas Ornamentales, Cactus y Suculentas</div>
-          <div>"Dios hace florecer el desierto"</div>
-          <div>Isaías 35:1</div>
-        </div>
-        <div>Factura: ${lastSaleData.orderNumber}</div>
-        <div>Fecha: ${new Date().toLocaleString()}</div>
-        <div>Atendió: ${employeeName || 'Empleado'}</div>
-        <div>--------------------------------</div>
-        ${lastSaleData.items.map((item: any) => `
-          <div class="item">
-            <span>${item.name} x${item.quantity}</span>
-            <span>Q${(item.price * item.quantity).toFixed(2)}</span>
-          </div>
-        `).join('')}
-        <div>--------------------------------</div>
-        <div class="item"><span>Subtotal sin IVA:</span><span>Q${(lastSaleData.total - lastSaleData.iva).toFixed(2)}</span></div>
-        <div class="item"><span>IVA (12%):</span><span>Q${lastSaleData.iva.toFixed(2)}</span></div>
-        <div class="total"><div class="item"><strong>TOTAL:</strong><strong>Q${lastSaleData.total.toFixed(2)}</strong></div></div>
-        ${lastSaleData.cash > 0 ? `
-          <div class="item"><span>Efectivo:</span><span>Q${lastSaleData.cash.toFixed(2)}</span></div>
-          <div class="item"><strong>VUELTO:</strong><strong>Q${lastSaleData.change.toFixed(2)}</strong></div>
-        ` : selectedPaymentMethod === 'card' ? `
-          <div class="item"><span>Tarjeta:</span><span>Q${lastSaleData.total.toFixed(2)}</span></div>
-        ` : selectedPaymentMethod === 'transfer' ? `
-          <div class="item"><span>Transferencia:</span><span>Q${lastSaleData.total.toFixed(2)}</span></div>
-        ` : ''}
-        <div>--------------------------------</div>
-        <div class="footer">
-          <p>¡Gracias por su compra!</p>
-          <p>🌵 Síguenos en redes sociales 🌵</p>
-        </div>
-      </body>
-      </html>
-    `)
-    ticketWindow.document.close()
-    ticketWindow.print()
   }
 
   const handleLogout = async () => {
@@ -282,176 +93,71 @@ export default function PosPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="bg-[#1B4332] text-white sticky top-0 z-10 shadow-lg">
-        <div className="px-6 py-3 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold">Punto de Venta</h1>
-            <p className="text-sm text-white/70">Atendiendo: {employeeName}</p>
-            <p className="text-xs text-white/50 capitalize">{employeeRole}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-white/70">Desierto que Florece</p>
-              <p className="text-xs">{new Date().toLocaleString()}</p>
-            </div>
-            <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
-              Cerrar sesión
-            </button>
-          </div>
+      <div className="bg-[#1B4332] text-white p-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold">Punto de Venta</h1>
+          <p className="text-sm">Atendiendo: {employeeName}</p>
         </div>
+        <button onClick={handleLogout} className="bg-red-600 px-4 py-2 rounded-lg">Cerrar sesión</button>
       </div>
 
-      <div className="flex h-[calc(100vh-85px)]">
-        <div className="flex-1 flex flex-col p-4 overflow-hidden">
-          <div className="mb-4 relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, SKU o código de barras..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#1B4332]"
-              autoFocus
-            />
-          </div>
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            <button onClick={() => setSelectedCategory(null)} className={`px-4 py-1.5 rounded-full text-sm ${selectedCategory === null ? 'bg-[#1B4332] text-white' : 'bg-white text-[#1B4332] border'}`}>
-              Todos
-            </button>
-            {categories.map(cat => (
-              <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`px-4 py-1.5 rounded-full text-sm ${selectedCategory === cat.id ? 'bg-[#1B4332] text-white' : 'bg-white text-[#1B4332] border'}`}>
-                {cat.name}
+      <div className="flex flex-col md:flex-row h-[calc(100vh-70px)]">
+        {/* Productos */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {products.map(p => (
+              <button
+                key={p.id}
+                onClick={() => addItem({ id: p.id, name: p.name, price: p.base_price, quantity: 1 })}
+                className="bg-white p-3 rounded-xl shadow text-center"
+              >
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  {p.image_url ? <img src={p.image_url} className="w-12 h-12 rounded-full" /> : <span className="text-3xl">🌵</span>}
+                </div>
+                <p className="font-medium text-sm">{p.name}</p>
+                <p className="text-[#1B4332] font-bold">Q{p.base_price.toFixed(2)}</p>
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {filteredProducts.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => addItem({ id: p.id, name: p.name, price: p.base_price, quantity: 1 })}
-                  className="bg-white p-3 rounded-xl shadow hover:shadow-md text-center"
-                >
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                    {p.image_url ? <img src={p.image_url} className="w-12 h-12 object-cover rounded-full" /> : <span className="text-3xl">🌵</span>}
-                  </div>
-                  <p className="font-medium text-sm truncate">{p.name}</p>
-                  <p className="text-[#1B4332] font-bold">Q{p.base_price.toFixed(2)}</p>
-                  {p.barcode && <p className="text-xs text-gray-400">{p.barcode}</p>}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
-        <div className="w-96 bg-white border-l flex flex-col shadow-lg">
+        {/* Carrito */}
+        <div className="w-full md:w-96 bg-white border-l flex flex-col">
           <div className="p-4 bg-[#1B4332] text-white">
             <h2 className="font-bold">Carrito</h2>
             <p className="text-xs">{items.length} productos</p>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {items.length === 0 && !lastSaleData ? (
-              <div className="text-center py-12">
-                <span className="text-5xl">🛒</span>
-                <p className="text-gray-400">Carrito vacío</p>
-              </div>
-            ) : items.length > 0 ? (
-              <div className="space-y-3">
-                {items.map(item => (
-                  <div key={item.id} className="flex justify-between items-center border-b pb-3">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-gray-500">Q{item.price.toFixed(2)} c/u</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-100 rounded-full">-</button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 bg-gray-100 rounded-full">+</button>
-                      <button onClick={() => removeItem(item.id)} className="text-red-500">🗑️</button>
-                    </div>
+            {items.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">Carrito vacío</div>
+            ) : (
+              items.map(item => (
+                <div key={item.id} className="flex justify-between items-center border-b py-2">
+                  <div className="flex-1">
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-xs text-gray-500">Q{item.price.toFixed(2)} c/u</p>
                   </div>
-                ))}
-              </div>
-            ) : lastSaleData && (
-              <div className="text-center py-12">
-                <span className="text-5xl mb-3 block">✅</span>
-                <p className="text-green-600 font-medium">¡Venta completada!</p>
-                <p className="text-sm text-gray-500 mt-1">Total: Q{lastSaleData.total.toFixed(2)}</p>
-                <p className="text-xs text-gray-400 mt-1">Factura: {lastSaleData.orderNumber}</p>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-100 rounded-full">-</button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 bg-gray-100 rounded-full">+</button>
+                    <button onClick={() => removeItem(item.id)} className="text-red-500">🗑️</button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
-          <div className="border-t p-4 space-y-3 bg-gray-50">
-            {items.length > 0 && (
-              <>
-                <div className="flex justify-between"><span>Total</span><span className="font-bold text-[#1B4332]">Q{total.toFixed(2)}</span></div>
-                <div className="flex justify-between text-xs text-gray-500"><span>IVA (12% incluido)</span><span>Q{ivaCalculado.toFixed(2)}</span></div>
-                <div className="grid grid-cols-3 gap-2 pt-4">
-                  <button onClick={() => openCashModal('cash')} className="bg-[#2D6A4F] text-white py-2 rounded-lg font-semibold text-sm">💵 Efectivo</button>
-                  <button onClick={() => openCashModal('card')} className="bg-[#E76F51] text-white py-2 rounded-lg font-semibold text-sm">💳 Tarjeta</button>
-                  <button onClick={() => openCashModal('transfer')} className="bg-[#1B4332] text-white py-2 rounded-lg font-semibold text-sm">📱 Transferencia</button>
-                </div>
-                <button onClick={() => clearCart()} className="w-full text-red-500 text-sm py-1 hover:underline">Vaciar carrito</button>
-              </>
-            )}
-            
-            {/* Botón imprimir SIEMPRE visible después de una venta */}
-            {lastSaleData && (
-              <button 
-                onClick={printLastTicket} 
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold text-sm hover:bg-blue-700 transition mt-2"
-              >
-                🖨️ Imprimir última factura
-              </button>
-            )}
+          <div className="border-t p-4 space-y-2">
+            <div className="flex justify-between font-bold"><span>Total</span><span>Q{total.toFixed(2)}</span></div>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => handlePayment('cash')} className="bg-[#2D6A4F] text-white py-2 rounded-lg">💵 Efectivo</button>
+              <button onClick={() => handlePayment('card')} className="bg-[#E76F51] text-white py-2 rounded-lg">💳 Tarjeta</button>
+              <button onClick={() => handlePayment('transfer')} className="bg-[#1B4332] text-white py-2 rounded-lg">📱 Transferencia</button>
+            </div>
+            {items.length > 0 && <button onClick={() => clearCart()} className="w-full text-red-500 text-sm">Vaciar</button>}
           </div>
         </div>
       </div>
-
-      {showCashModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-5 border-b flex justify-between">
-              <h2 className="text-xl font-bold">Pago en Efectivo</h2>
-              <button onClick={() => setShowCashModal(false)} className="text-2xl">&times;</button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-gray-100 p-4 rounded-xl text-center">
-                <p className="text-sm text-gray-600">Total a pagar</p>
-                <p className="text-3xl font-bold text-[#1B4332]">Q{total.toFixed(2)}</p>
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Monto recibido</label>
-                <input
-                  type="number"
-                  step="1"
-                  value={cashAmount}
-                  onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full p-3 border rounded-xl text-lg"
-                  autoFocus
-                />
-              </div>
-              {cashAmount >= total && (
-                <div className="bg-green-50 p-4 rounded-xl">
-                  <div className="flex justify-between">
-                    <span>Vuelto:</span>
-                    <span className="text-2xl font-bold text-green-600">Q{change.toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-              {cashAmount < total && cashAmount > 0 && (
-                <div className="bg-red-50 p-4 rounded-xl">
-                  <p className="text-red-600">Faltan Q{(total - cashAmount).toFixed(2)}</p>
-                </div>
-              )}
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setShowCashModal(false)} className="flex-1 px-4 py-2 border rounded-xl">Cancelar</button>
-                <button onClick={handleCashPayment} disabled={cashAmount < total} className="flex-1 px-4 py-2 bg-[#1B4332] text-white rounded-xl">Cobrar</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
