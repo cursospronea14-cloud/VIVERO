@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,17 @@ export default function LoginPage() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.replace('/admin')
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        const role = profile?.role || 'vendedor'
+        if (role === 'admin') router.replace('/admin')
+        else if (role === 'bodeguero') router.replace('/bodega')
+        else if (role === 'fumigador') router.replace('/fumigacion')
+        else router.replace('/pos')
       }
     }
     checkSession()
@@ -37,13 +48,21 @@ export default function LoginPage() {
       return
     }
 
-    if (data?.session) {
-      toast.success('Bienvenido Administrador')
-      await supabase.auth.setSession(data.session)
-      router.replace('/admin')
-      router.refresh()
+    if (data?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+      
+      const role = profile?.role || 'vendedor'
+      toast.success('Bienvenido al sistema')
+      
+      if (role === 'admin') router.replace('/admin')
+      else if (role === 'bodeguero') router.replace('/bodega')
+      else if (role === 'fumigador') router.replace('/fumigacion')
+      else router.replace('/pos')
     }
-
     setLoading(false)
   }
 
@@ -54,9 +73,9 @@ export default function LoginPage() {
           <div className="w-20 h-20 bg-[#1B4332] rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
             <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-2xl font-bold text-[#1B4332]">FLORECE</h1>
-          <p className="text-gray-500 text-sm">Cactus & Suculentas</p>
-          <p className="text-xs italic text-gray-400 mt-2">"Dios hace florecer el desierto"</p>
+          <h1 className="text-2xl font-bold text-[#1B4332]">DESIERTO QUE FLORECE</h1>
+          <p className="text-gray-500 text-sm">Plantas Ornamentales, Cactus y Suculentas</p>
+          <p className="text-xs italic text-gray-400 mt-2">"Dios hace florecer el desierto. Isaías 35:1"</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -71,7 +90,6 @@ export default function LoginPage() {
               placeholder="admin@florece.com"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
             <div className="relative">
@@ -92,7 +110,6 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-
           <button
             type="submit"
             disabled={loading}
@@ -101,11 +118,6 @@ export default function LoginPage() {
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-xs text-gray-400">
-          <p>Sistema de gestión de vivero</p>
-          <p className="mt-1">© 2026 Florece</p>
-        </div>
       </div>
     </div>
   )
