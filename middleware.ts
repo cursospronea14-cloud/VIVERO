@@ -13,8 +13,10 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return req.cookies.getAll() },
-        setAll(cookiesToSet) {
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet: { name: string; value: string; options?: { maxAge?: number; domain?: string; path?: string; sameSite?: 'lax' | 'strict' | 'none'; secure?: boolean } }[]) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -40,11 +42,12 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
+  // Si no hay sesión, redirigir a login
   if (!session) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Obtener rol del usuario
+  // Obtener el rol del usuario
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
