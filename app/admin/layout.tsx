@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .eq('id', session.user.id)
         .single()
       
-      if (profile?.role !== 'admin' && profile?.role !== 'gerente') {
+      if (profile?.role !== 'admin') {
         router.push('/pos')
         return
       }
@@ -56,12 +56,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="fixed left-0 top-0 h-full w-64 bg-[#1B4332] text-white shadow-xl z-50 overflow-y-auto">
         <div className="p-4 border-b border-white/20">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
-            </div>
+            <img src="/logo.jpg" alt="Logo" className="w-10 h-10 rounded-full object-cover" />
             <div>
               <h1 className="font-bold text-sm">DESIERTO QUE FLORECE</h1>
-              <p className="text-xs text-white/60">Administrador</p>
+              <p className="text-xs text-white/60">Admin</p>
             </div>
           </div>
         </div>
@@ -77,17 +75,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               }`}
             >
               <span>{item.icon}</span>
-              <span className="text-sm">{item.name}</span>
+              <span>{item.name}</span>
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20 bg-[#1B4332]">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20">
           <button
             onClick={() => supabase.auth.signOut()}
-            className="flex items-center gap-3 text-white/80 hover:text-white w-full px-4 py-2 rounded-xl hover:bg-white/10 transition"
+            className="flex items-center gap-3 text-white/80 hover:text-white w-full px-4 py-2 rounded-xl hover:bg-white/10"
           >
-            <span>🚪</span>
-            <span>Cerrar sesión</span>
+            🚪 Cerrar sesión
           </button>
         </div>
       </aside>
