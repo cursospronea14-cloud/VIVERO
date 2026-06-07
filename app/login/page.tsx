@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -56,7 +55,7 @@ export default function LoginPage() {
         .single()
       
       const role = profile?.role || 'vendedor'
-      toast.success(`Bienvenido ${role === 'admin' ? 'Administrador' : 'Empleado'}`)
+      toast.success('Bienvenido al sistema')
       
       if (role === 'admin') router.replace('/admin')
       else if (role === 'bodeguero') router.replace('/bodega')
