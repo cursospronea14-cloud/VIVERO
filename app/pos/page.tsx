@@ -10,6 +10,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [employeeName, setEmployeeName] = useState('')
+  const [businessInfo, setBusinessInfo] = useState({ name: '', nit: '', address: '' })
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
@@ -22,14 +23,32 @@ export default function PosPage() {
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, role')
         .eq('id', user.id)
         .single()
-      if (profile) setEmployeeName(profile.full_name || 'Vendedor')
+      if (profile) {
+        setEmployeeName(profile.full_name || 'Vendedor')
+        if (profile.role === 'admin') router.push('/admin')
+        if (profile.role === 'bodeguero') router.push('/bodega')
+        if (profile.role === 'fumigador') router.push('/fumigacion')
+      }
+
+      // Cargar información del negocio
+      const { data: settings } = await supabase
+        .from('app_settings')
+        .select('business_name, nit, address')
+        .single()
+      if (settings) {
+        setBusinessInfo({
+          name: settings.business_name || 'Desierto que Florece',
+          nit: settings.nit || ' Pendiente',
+          address: settings.address || 'Ciudad de Guatemala'
+        })
+      }
 
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, name, base_price')
+        .select('id, name, base_price, barcode')
         .eq('is_active', true)
         .limit(50)
       if (productsData) setProducts(productsData)
@@ -39,15 +58,104 @@ export default function PosPage() {
   }, [router])
 
   const total = getTotal()
+  const iva = total * 0.12 / 1.12
 
-  const processPayment = async (method: string) => {
+  const printTicket = (saleData: any) => {
+    const ticketWindow = window.open('', '_blank')
+    if (!ticketWindow) return
+
+    const fecha = new Date()
+    const fechaStr = `${fecha.getDate().toString().padStart(2,'0')}/${(fecha.getMonth()+1).toString().padStart(2,'0')}/${fecha.getFullYear().toString().slice(-2)} ${fecha.getHours().toString().padStart(2,'0')}:${fecha.getMinutes().toString().padStart(2,'0')}:${fecha.getSeconds().toString().padStart(2,'0')}`
+
+    const itemsList = saleData.items.map((item: any, idx: number) => {
+      const itemTotal = item.price * item.quantity
+      return `
+        <tr>
+          <td style="padding: 2px;">${idx + 1}</td>
+          <td style="padding: 2px;">${item.name}</td>
+          <td style="padding: 2px; text-align: center;">${item.quantity}</td>
+          <td style="padding: 2px; text-align: right;">Q${item.price.toFixed(2)}</td>
+          <td style="padding: 2px; text-align: right;">Q${itemTotal.toFixed(2)}</td>
+        </tr>
+      `
+    }).join('')
+
+    ticketWindow.document.write(`
+      <html>
+      <head>
+        <title>Factura - Desierto que Florece</title>
+        <style>
+          body { font-family: monospace; font-size: 11px; padding: 15px; width: 280px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px; }
+          .title { font-size: 14px; font-weight: bold; }
+          .info { margin: 5px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+          th, td { border-bottom: 1px dotted #ccc; padding: 4px 2px; text-align: left; }
+          .total { border-top: 1px solid #000; margin-top: 8px; padding-top: 8px; }
+          .footer { text-align: center; margin-top: 15px; font-size: 9px; border-top: 1px dashed #000; padding-top: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">🌵 ${businessInfo.name}</div>
+          <div>NIT: ${businessInfo.nit}</div>
+          <div>${businessInfo.address}</div>
+          <div>"Dios hace florecer el desierto"</div>
+        </div>
+        <div class="info">
+          <div>FACTURA No. ${saleData.orderNumber}</div>
+          <div>FECHA: ${fechaStr}</div>
+          <div>ATENDIÓ: ${employeeName}</div>
+          <div>CLIENTE: Mostrador</div>
+        </div>
+        <table>
+          <thead>
+            <tr style="border-bottom: 1px solid #000;">
+              <th>Cant</th>
+              <th>Producto</th>
+              <th>Precio</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsList}
+          </tbody>
+        </table>
+        <div style="text-align: right;">
+          <div>SUBTOTAL: Q${saleData.subtotal.toFixed(2)}</div>
+          <div>IVA (12%): Q${saleData.iva.toFixed(2)}</div>
+          <div class="total"><strong>TOTAL: Q${saleData.total.toFixed(2)}</strong></div>
+        </div>
+        <div class="footer">
+          <div>¡Gracias por su compra!</div>
+          <div>📱 Síguenos en redes sociales</div>
+          <div>Desierto que Florece - Cactus y Suculentas</div>
+        </div>
+      </body>
+      </html>
+    `)
+    ticketWindow.document.close()
+    ticketWindow.print()
+  }
+
+  const processPayment = async (method: string, cashReceived?: number) => {
     if (items.length === 0) {
       toast.error('Agrega productos primero')
       return
     }
 
     const { data: { user } } = await supabase.auth.getUser()
-    const orderNumber = `POS-${Date.now()}`
+    const orderNumber = `F${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 1000)}`
+
+    const saleData = {
+      orderNumber,
+      items,
+      subtotal: total,
+      iva: iva,
+      total: total,
+      cashReceived,
+      change: cashReceived ? cashReceived - total : 0
+    }
 
     const { error } = await supabase.from('orders').insert({
       order_number: orderNumber,
@@ -55,6 +163,7 @@ export default function PosPage() {
       customer_name: 'Cliente de mostrador',
       items: items,
       subtotal: total,
+      iva: iva,
       total: total,
       payment_method: method,
       sale_type: 'pos',
@@ -62,9 +171,10 @@ export default function PosPage() {
     })
 
     if (error) {
-      toast.error('Error: ' + error.message)
+      toast.error('Error al registrar venta')
     } else {
       toast.success(`Venta registrada - Q${total.toFixed(2)}`)
+      printTicket(saleData)
       clearCart()
     }
   }
@@ -93,7 +203,6 @@ export default function PosPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row h-[calc(100vh-70px)]">
-        {/* Productos */}
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {products.map((p) => (
@@ -112,7 +221,6 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* Carrito */}
         <div className="w-full lg:w-96 bg-white border-l flex flex-col">
           <div className="p-4 bg-[#1B4332] text-white">
             <h2 className="font-bold">Carrito</h2>
@@ -140,7 +248,7 @@ export default function PosPage() {
           </div>
           <div className="border-t p-4">
             <div className="flex justify-between font-bold text-lg mb-4">
-              <span>Total</span>
+              <span>TOTAL</span>
               <span>Q{total.toFixed(2)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
