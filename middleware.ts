@@ -13,10 +13,8 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return req.cookies.getAll()
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+        getAll() { return req.cookies.getAll() },
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -28,7 +26,7 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const path = req.nextUrl.pathname
 
-  // Rutas públicas (accesibles sin login)
+  // Rutas públicas
   const isPublicPath = 
     path === '/' ||
     path === '/login' ||
@@ -42,13 +40,11 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  // Si no hay sesión, redirigir a login
   if (!session) {
-    const redirectUrl = new URL('/login', req.url)
-    return NextResponse.redirect(redirectUrl)
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Obtener el rol del usuario
+  // Obtener rol del usuario
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -57,7 +53,7 @@ export async function middleware(req: NextRequest) {
 
   const userRole = profile?.role || 'vendedor'
 
-  // Si está en login, redirigir según su rol
+  // Redirigir según rol si está en login
   if (path === '/login') {
     if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', req.url))
@@ -70,7 +66,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Verificar acceso según el rol
+  // Restricciones de acceso
   if (userRole === 'admin') {
     return response
   }
