@@ -17,7 +17,11 @@ export default function BodegaPage() {
         router.replace('/login')
         return
       }
-      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
       if (profile) setEmployeeName(profile.full_name || 'Bodeguero')
       setLoading(false)
     }
@@ -48,16 +52,14 @@ export default function BodegaPage() {
       </div>
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="font-semibold text-lg mb-3">📦 Control de Inventario</h2>
-            <p className="text-gray-500 text-sm">Gestiona el stock de productos</p>
-            <Link href="/admin/inventario" className="inline-block mt-4 text-[#1B4332] underline">Ver inventario →</Link>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="font-semibold text-lg mb-3">📥 Registrar Compra</h2>
-            <p className="text-gray-500 text-sm">Registra productos de proveedores</p>
-            <Link href="/bodega/compras" className="inline-block mt-4 text-[#1B4332] underline">Registrar compra →</Link>
-          </div>
+          <Link href="/admin/inventario" className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <h2 className="font-semibold text-lg">📦 Inventario</h2>
+            <p className="text-gray-500 text-sm">Control de stock de productos</p>
+          </Link>
+          <Link href="/bodega/compras" className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <h2 className="font-semibold text-lg">📥 Compras</h2>
+            <p className="text-gray-500 text-sm">Registrar entrada de productos</p>
+          </Link>
         </div>
       </div>
     </div>
