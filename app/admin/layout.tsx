@@ -9,7 +9,7 @@ const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
   { name: 'Productos', href: '/admin/productos', icon: '🌵' },
   { name: 'Categorías', href: '/admin/categorias', icon: '📁' },
-  name: 'Empleados', href: '/admin/empleados', icon: '👥' },
+  { name: 'Empleados', href: '/admin/empleados', icon: '👥' },
   { name: 'Inventario', href: '/admin/inventario', icon: '📦' },
   { name: 'Ventas', href: '/admin/ventas', icon: '💰' },
   { name: 'Reportes', href: '/admin/reportes', icon: '📈' },
