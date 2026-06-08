@@ -10,105 +10,72 @@ export default function PosPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [employeeName, setEmployeeName] = useState('')
+  const [employeeRole, setEmployeeRole] = useState('')
   const { items, addItem, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-      if (profile) {
-        setEmployeeName(profile.full_name || 'Vendedor')
-        if (profile.role === 'admin') router.push('/admin')
-        if (profile.role === 'bodeguero') router.push('/bodega')
-        if (profile.role === 'fumigador') router.push('/fumigacion')
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.log('Usuario autenticado:', user?.email)
+        
+        if (!user) {
+          router.push('/login')
+          return
+        }
+        
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) {
+          console.error('Error obteniendo perfil:', error)
+          setEmployeeName('Vendedor')
+          setEmployeeRole('vendedor')
+        } else if (profile) {
+          console.log('Perfil encontrado:', profile)
+          setEmployeeName(profile.full_name || 'Vendedor')
+          setEmployeeRole(profile.role || 'vendedor')
+          
+          // Redirigir según rol (excepto vendedor)
+          if (profile.role === 'admin') {
+            console.log('Redirigiendo a /admin')
+            router.push('/admin')
+            return
+          }
+          if (profile.role === 'bodeguero') {
+            console.log('Redirigiendo a /bodega')
+            router.push('/bodega')
+            return
+          }
+          if (profile.role === 'fumigador') {
+            console.log('Redirigiendo a /fumigacion')
+            router.push('/fumigacion')
+            return
+          }
+        }
 
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, name, base_price')
-        .eq('is_active', true)
-        .limit(50)
-      if (productsData) setProducts(productsData)
-      setLoading(false)
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, name, base_price')
+          .eq('is_active', true)
+          .limit(50)
+        
+        console.log('Productos cargados:', productsData?.length || 0)
+        if (productsData) setProducts(productsData)
+      } catch (err) {
+        console.error('Error en fetchData:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchData()
   }, [router])
 
   const total = getTotal()
-  const iva = total * 0.12 / 1.12
-
-  const printTicket = (saleData: any) => {
-    const ticketWindow = window.open('', '_blank')
-    if (!ticketWindow) return
-
-    const fecha = new Date()
-    const fechaStr = `${fecha.getDate().toString().padStart(2,'0')}/${(fecha.getMonth()+1).toString().padStart(2,'0')}/${fecha.getFullYear()} ${fecha.getHours().toString().padStart(2,'0')}:${fecha.getMinutes().toString().padStart(2,'0')}:${fecha.getSeconds().toString().padStart(2,'0')}`
-
-    const itemsList = saleData.items.map((item: any) => {
-      const itemTotal = item.price * item.quantity
-      return `
-        <tr>
-          <td style="padding: 4px;">${item.name}</td>
-          <td style="padding: 4px; text-align: center;">${item.quantity}</td>
-          <td style="padding: 4px; text-align: right;">Q${item.price.toFixed(2)}</td>
-          <td style="padding: 4px; text-align: right;">Q${itemTotal.toFixed(2)}</td>
-        </tr>
-      `
-    }).join('')
-
-    ticketWindow.document.write(`
-      <html>
-      <head>
-        <title>Factura - Desierto que Florece</title>
-        <style>
-          body { font-family: monospace; font-size: 12px; padding: 20px; width: 300px; margin: 0 auto; }
-          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .title { font-size: 16px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-          th, td { border-bottom: 1px dotted #ccc; padding: 5px; text-align: left; }
-          .total { border-top: 1px solid #000; margin-top: 10px; padding-top: 10px; text-align: right; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">🌵 DESIERTO QUE FLORECE</div>
-          <div>Plantas Ornamentales, Cactus y Suculentas</div>
-          <div>"Dios hace florecer el desierto. Isaías 35:1"</div>
-        </div>
-        <div>FACTURA No. ${saleData.orderNumber}</div>
-        <div>FECHA: ${fechaStr}</div>
-        <div>ATENDIÓ: ${employeeName}</div>
-        <div>--------------------------------</div>
-        <table>
-          <thead>
-            <tr><th>Producto</th><th>Cant</th><th>Precio</th><th>Total</th></tr>
-          </thead>
-          <tbody>${itemsList}</tbody>
-        </table>
-        <div class="total">
-          <div>SUBTOTAL: Q${saleData.subtotal.toFixed(2)}</div>
-          <div>IVA (12%): Q${saleData.iva.toFixed(2)}</div>
-          <div><strong>TOTAL: Q${saleData.total.toFixed(2)}</strong></div>
-        </div>
-        <div class="footer">
-          <div>¡Gracias por su compra!</div>
-        </div>
-      </body>
-      </html>
-    `)
-    ticketWindow.document.close()
-    ticketWindow.print()
-  }
 
   const processPayment = async (method: string) => {
     if (items.length === 0) {
@@ -116,37 +83,32 @@ export default function PosPage() {
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const orderNumber = `F${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 1000)}`
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const orderNumber = `POS-${Date.now()}`
 
-    const saleData = {
-      orderNumber,
-      items,
-      subtotal: total,
-      iva: iva,
-      total: total,
-    }
+      const { error } = await supabase.from('orders').insert({
+        order_number: orderNumber,
+        seller_id: user?.id,
+        customer_name: 'Cliente de mostrador',
+        items: items,
+        subtotal: total,
+        total: total,
+        payment_method: method,
+        sale_type: 'pos',
+        status: 'paid',
+      })
 
-    const { error } = await supabase.from('orders').insert({
-      order_number: orderNumber,
-      seller_id: user?.id,
-      customer_name: 'Cliente de mostrador',
-      items: items,
-      subtotal: total,
-      iva: iva,
-      total: total,
-      payment_method: method,
-      sale_type: 'pos',
-      status: 'paid',
-    })
-
-    if (error) {
-      console.error('Error:', error)
-      toast.error('Error al registrar venta: ' + error.message)
-    } else {
-      toast.success(`Venta registrada - Q${total.toFixed(2)}`)
-      printTicket(saleData)
-      clearCart()
+      if (error) {
+        console.error('Error al guardar:', error)
+        toast.error('Error al registrar venta: ' + error.message)
+      } else {
+        toast.success(`Venta registrada - Q${total.toFixed(2)}`)
+        clearCart()
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      toast.error('Error inesperado')
     }
   }
 
@@ -169,12 +131,12 @@ export default function PosPage() {
         <div>
           <h1 className="text-xl font-bold">Punto de Venta</h1>
           <p className="text-sm">Atendiendo: {employeeName}</p>
+          <p className="text-xs opacity-70">Rol: {employeeRole}</p>
         </div>
         <button onClick={handleLogout} className="bg-red-600 px-4 py-2 rounded-lg">Cerrar sesión</button>
       </div>
 
       <div className="flex flex-col lg:flex-row h-[calc(100vh-70px)]">
-        {/* Productos */}
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {products.map((p) => (
@@ -193,7 +155,6 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* Carrito */}
         <div className="w-full lg:w-96 bg-white border-l flex flex-col">
           <div className="p-4 bg-[#1B4332] text-white">
             <h2 className="font-bold">Carrito</h2>
