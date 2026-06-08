@@ -23,7 +23,16 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
 
   // Rutas públicas
-  if (path === '/' || path === '/login' || path.startsWith('/_next') || path.includes('.')) {
+  const isPublicPath = 
+    path === '/' ||
+    path === '/login' ||
+    path.startsWith('/product/') ||
+    path.startsWith('/_next') ||
+    path.startsWith('/favicon') ||
+    path.startsWith('/logo') ||
+    path.includes('.')
+
+  if (isPublicPath) {
     return response
   }
 
@@ -31,32 +40,51 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Obtener rol - usando maybeSingle para evitar errores
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .maybeSingle()
+  // Obtener rol - versión CORREGIDA sin maybeSingle
+  let userRole = 'vendedor'
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+    
+    if (!error && profile) {
+      userRole = profile.role || 'vendedor'
+    }
+  } catch (err) {
+    console.error('Error obteniendo rol:', err)
+  }
 
-  const role = profile?.role || 'vendedor'
+  console.log('Middleware - Usuario:', session.user.email, 'Rol:', userRole, 'Path:', path)
 
   // Redirección post-login
   if (path === '/login') {
-    if (role === 'admin') return NextResponse.redirect(new URL('/admin', req.url))
-    if (role === 'bodeguero') return NextResponse.redirect(new URL('/bodega', req.url))
-    if (role === 'fumigador') return NextResponse.redirect(new URL('/fumigacion', req.url))
-    return NextResponse.redirect(new URL('/pos', req.url))
+    if (userRole === 'admin') {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    } else if (userRole === 'bodeguero') {
+      return NextResponse.redirect(new URL('/bodega', req.url))
+    } else if (userRole === 'fumigador') {
+      return NextResponse.redirect(new URL('/fumigacion', req.url))
+    } else {
+      return NextResponse.redirect(new URL('/pos', req.url))
+    }
   }
 
-  // Restricciones
-  if (role === 'admin') return response
-  if (role === 'bodeguero' && !path.startsWith('/bodega')) {
+  // Restricciones de acceso
+  if (userRole === 'admin') {
+    return response
+  }
+
+  if (userRole === 'bodeguero' && !path.startsWith('/bodega')) {
     return NextResponse.redirect(new URL('/bodega', req.url))
   }
-  if (role === 'fumigador' && !path.startsWith('/fumigacion')) {
+
+  if (userRole === 'fumigador' && !path.startsWith('/fumigacion')) {
     return NextResponse.redirect(new URL('/fumigacion', req.url))
   }
-  if (role === 'vendedor' && !path.startsWith('/pos')) {
+
+  if (userRole === 'vendedor' && !path.startsWith('/pos')) {
     return NextResponse.redirect(new URL('/pos', req.url))
   }
 
