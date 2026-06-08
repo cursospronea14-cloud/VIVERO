@@ -9,11 +9,13 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return req.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet: any[]) {
+          cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
@@ -40,38 +42,37 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Obtener rol - versión CORREGIDA sin maybeSingle
+  // Obtener rol del usuario
   let userRole = 'vendedor'
   try {
-    const { data: profile, error } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', session.user.id)
       .single()
     
-    if (!error && profile) {
+    if (profile) {
       userRole = profile.role || 'vendedor'
     }
   } catch (err) {
-    console.error('Error obteniendo rol:', err)
+    console.error('Error al obtener rol:', err)
   }
 
-  console.log('Middleware - Usuario:', session.user.email, 'Rol:', userRole, 'Path:', path)
-
-  // Redirección post-login
+  // Si está en login, redirigir según su rol
   if (path === '/login') {
     if (userRole === 'admin') {
       return NextResponse.redirect(new URL('/admin', req.url))
-    } else if (userRole === 'bodeguero') {
-      return NextResponse.redirect(new URL('/bodega', req.url))
-    } else if (userRole === 'fumigador') {
-      return NextResponse.redirect(new URL('/fumigacion', req.url))
-    } else {
-      return NextResponse.redirect(new URL('/pos', req.url))
     }
+    if (userRole === 'bodeguero') {
+      return NextResponse.redirect(new URL('/bodega', req.url))
+    }
+    if (userRole === 'fumigador') {
+      return NextResponse.redirect(new URL('/fumigacion', req.url))
+    }
+    return NextResponse.redirect(new URL('/pos', req.url))
   }
 
-  // Restricciones de acceso
+  // Restricciones de acceso según rol
   if (userRole === 'admin') {
     return response
   }
