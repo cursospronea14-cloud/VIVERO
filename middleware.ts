@@ -2,20 +2,21 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
+  let response = NextResponse.next()
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return req.cookies.getAll()
+        get(name: string) {
+          return req.cookies.get(name)?.value
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            const response = NextResponse.next()
-            response.cookies.set(name, value, options)
-            return response
-          })
+        set(name: string, value: string, options: any) {
+          response.cookies.set(name, value, options)
+        },
+        remove(name: string, options: any) {
+          response.cookies.set(name, '', options)
         },
       },
     }
@@ -25,8 +26,17 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
 
   // Rutas públicas
-  if (path === '/' || path === '/login' || path.startsWith('/_next') || path.includes('.')) {
-    return NextResponse.next()
+  const isPublicPath = 
+    path === '/' ||
+    path === '/login' ||
+    path.startsWith('/product/') ||
+    path.startsWith('/_next') ||
+    path.startsWith('/favicon') ||
+    path.startsWith('/logo') ||
+    path.includes('.')
+
+  if (isPublicPath) {
+    return response
   }
 
   if (!session) {
@@ -34,35 +44,52 @@ export async function middleware(req: NextRequest) {
   }
 
   // Obtener rol
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single()
-
-  const role = profile?.role || 'vendedor'
-
-  // Redirigir según rol
-  if (path === '/login') {
-    if (role === 'admin') return NextResponse.redirect(new URL('/admin', req.url))
-    if (role === 'bodeguero') return NextResponse.redirect(new URL('/bodega', req.url))
-    if (role === 'fumigador') return NextResponse.redirect(new URL('/fumigacion', req.url))
-    return NextResponse.redirect(new URL('/pos', req.url))
+  let userRole = 'vendedor'
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+    
+    if (profile) {
+      userRole = profile.role || 'vendedor'
+    }
+  } catch (err) {
+    console.error('Error obteniendo rol:', err)
   }
 
-  // Restricciones
-  if (role === 'admin') return NextResponse.next()
-  if (role === 'bodeguero' && !path.startsWith('/bodega')) {
+  // Redirección post-login
+  if (path === '/login') {
+    if (userRole === 'admin') {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    } else if (userRole === 'bodeguero') {
+      return NextResponse.redirect(new URL('/bodega', req.url))
+    } else if (userRole === 'fumigador') {
+      return NextResponse.redirect(new URL('/fumigacion', req.url))
+    } else {
+      return NextResponse.redirect(new URL('/pos', req.url))
+    }
+  }
+
+  // Restricciones de acceso
+  if (userRole === 'admin') {
+    return response
+  }
+
+  if (userRole === 'bodeguero' && !path.startsWith('/bodega')) {
     return NextResponse.redirect(new URL('/bodega', req.url))
   }
-  if (role === 'fumigador' && !path.startsWith('/fumigacion')) {
+
+  if (userRole === 'fumigador' && !path.startsWith('/fumigacion')) {
     return NextResponse.redirect(new URL('/fumigacion', req.url))
   }
-  if (role === 'vendedor' && !path.startsWith('/pos')) {
+
+  if (userRole === 'vendedor' && !path.startsWith('/pos')) {
     return NextResponse.redirect(new URL('/pos', req.url))
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {
