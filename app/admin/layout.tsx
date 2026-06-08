@@ -28,16 +28,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.push('/login')
         return
       }
-      const { data: profile } = await supabase
+      
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
         .single()
       
-      if (profile?.role !== 'admin') {
+      // Normalizar rol (quitar espacios, convertir a minúsculas)
+      const userRole = profile?.role?.toLowerCase().trim() || 'vendedor'
+      
+      // Solo admin y gerente pueden acceder a admin
+      if (userRole !== 'admin' && userRole !== 'gerente') {
+        console.log('Acceso denegado a admin. Rol:', userRole)
         router.push('/pos')
         return
       }
+      
       setLoading(false)
     }
     checkAuth()
@@ -59,7 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <img src="/logo.jpg" alt="Logo" className="w-10 h-10 rounded-full object-cover" />
             <div>
               <h1 className="font-bold text-sm">DESIERTO QUE FLORECE</h1>
-              <p className="text-xs text-white/60">Admin</p>
+              <p className="text-xs text-white/60">Administrador</p>
             </div>
           </div>
         </div>
